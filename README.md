@@ -22,6 +22,7 @@ To learn more about the original workflow behind this pipeline, see: https://bit
 ```bash
 sudo apt-get install mafft mcl ncbi-blast+ prank iqtree phyx
 ```
+Visit https://github.com/smirarab/ASTRAL/releases for Astral dependency
 
 <h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Installation</h2>
 
