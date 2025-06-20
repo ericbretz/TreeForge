@@ -106,7 +106,7 @@ TreeForge/
 └── FinalTree.tree  # Final phylogenetic tree
 ```
 
-<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Output Files</h2>
+<h2><img src="https://i.imgur.com/3iDSqEo.png" width="20" align="top">&ensp;Output Files</h2>
 
 - **`FinalTree.tree`** - The final phylogenetic tree in Newick format
 - **`treeforge.csv`** - Summary metrics for each pipeline step
