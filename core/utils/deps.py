@@ -34,54 +34,53 @@ class Deps:
         if missing_deps:
             self.printout('error', f'Missing dependencies: {", ".join(missing_deps)}')
             sys.exit(1)
-        self.check_pip()
+        # self.check_pip()
 
-    def check_pip(self):
-        # Try multiple possible locations for requirements.txt
-        possible_paths = [
-            os.path.join(os.getcwd(), 'requirements.txt'),
-            os.path.join(os.path.dirname(__file__), '..', '..', 'requirements.txt'),
-            os.path.join(os.path.dirname(sys.argv[0]), 'requirements.txt'),
-            os.path.join(os.path.dirname(sys.executable), 'requirements.txt'),
-        ]
+    # def check_pip(self):
+    #     possible_paths = [
+    #         os.path.join(os.getcwd(), 'requirements.txt'),
+    #         os.path.join(os.path.dirname(__file__), '..', '..', 'requirements.txt'),
+    #         os.path.join(os.path.dirname(sys.argv[0]), 'requirements.txt'),
+    #         os.path.join(os.path.dirname(sys.executable), 'requirements.txt'),
+    #     ]
         
-        requirements_file = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                requirements_file = path
-                break
+    #     requirements_file = None
+    #     for path in possible_paths:
+    #         if os.path.exists(path):
+    #             requirements_file = path
+    #             break
         
-        self.printout('title', 'Checking pip dependencies')
+    #     self.printout('title', 'Checking pip dependencies')
         
-        if not requirements_file:
-            self.printout('error', f'Requirements file not found. Tried paths: {possible_paths}')
-            sys.exit(1)
+    #     if not requirements_file:
+    #         self.printout('error', f'Requirements file not found. Tried paths: {possible_paths}')
+    #         sys.exit(1)
         
-        missing_deps = []
+    #     missing_deps = []
         
-        package_import_map = {
-            'biopython': 'Bio'
-        }
+    #     package_import_map = {
+    #         'biopython': 'Bio'
+    #     }
         
-        with open(requirements_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    package_name = line.split('>=')[0].split('<=')[0].split('==')[0].split('!=')[0].split('~=')[0].strip()
+    #     with open(requirements_file, 'r') as f:
+    #         for line in f:
+    #             line = line.strip()
+    #             if line and not line.startswith('#'):
+    #                 package_name = line.split('>=')[0].split('<=')[0].split('==')[0].split('!=')[0].split('~=')[0].strip()
                     
-                    import_name = package_import_map.get(package_name, package_name)
+    #                 import_name = package_import_map.get(package_name, package_name)
                     
-                    try:
-                        importlib.import_module(import_name)
-                        self.printout('metric', {package_name: 'found'})
-                    except ImportError:
-                        missing_deps.append(package_name)
+    #                 try:
+    #                     importlib.import_module(import_name)
+    #                     self.printout('metric', {package_name: 'found'})
+    #                 except ImportError:
+    #                     missing_deps.append(package_name)
         
-        if missing_deps:
-            self.printout('error', f'Missing pip dependencies: {", ".join(missing_deps)}')
-            sys.exit(1)
+    #     if missing_deps:
+    #         self.printout('error', f'Missing pip dependencies: {", ".join(missing_deps)}')
+    #         sys.exit(1)
 
 if __name__ == '__main__':
     deps = Deps(1, 'green', 'blue')
     deps.check_deps()
-    deps.check_pip()
+    # deps.check_pip()
