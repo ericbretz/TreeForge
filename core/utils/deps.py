@@ -37,16 +37,28 @@ class Deps:
         self.check_pip()
 
     def check_pip(self):
-        requirements_file = os.path.join(os.path.dirname(__file__), '..', '..', 'requirements.txt')
+        # Try multiple possible locations for requirements.txt
+        possible_paths = [
+            os.path.join(os.getcwd(), 'requirements.txt'),
+            os.path.join(os.path.dirname(__file__), '..', '..', 'requirements.txt'),
+            os.path.join(os.path.dirname(sys.argv[0]), 'requirements.txt'),
+            os.path.join(os.path.dirname(sys.executable), 'requirements.txt'),
+        ]
+        
+        requirements_file = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                requirements_file = path
+                break
+        
         self.printout('title', 'Checking pip dependencies')
         
-        if not os.path.exists(requirements_file):
-            self.printout('error', f'Requirements file not found: {requirements_file}')
+        if not requirements_file:
+            self.printout('error', f'Requirements file not found. Tried paths: {possible_paths}')
             sys.exit(1)
         
         missing_deps = []
         
-        # Map package names to their actual import names
         package_import_map = {
             'biopython': 'Bio'
         }
@@ -57,7 +69,6 @@ class Deps:
                 if line and not line.startswith('#'):
                     package_name = line.split('>=')[0].split('<=')[0].split('==')[0].split('!=')[0].split('~=')[0].strip()
                     
-                    # Use the import name if it's different from the package name
                     import_name = package_import_map.get(package_name, package_name)
                     
                     try:
