@@ -112,3 +112,7 @@ TreeForge/
 
 - **`FinalTree.tree`** - The final phylogenetic tree in Newick format
 - **`treeforge.csv`** - Summary metrics for each pipeline step
+
+<p align="center">
+  <img src="https://i.imgur.com/a5zYEj7.png" alt="Treeforge Workflow" width="1000">
+</p>
