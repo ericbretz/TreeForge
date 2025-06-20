@@ -16,7 +16,7 @@ To learn more about the original workflow behind this pipeline, see: https://bit
 - **ASTRAL** - Coalescent-based species tree estimation
 - **PHYX** - Phylogenetic tools (pxcat, pxclsq)
 
-<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Installation of Dependencies</h2>
+<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Dependencies</h2>
 
 #### Ubuntu/Debian:
 ```bash
