@@ -25,7 +25,7 @@ sudo apt-get install mafft mcl ncbi-blast+ prank iqtree phyx
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/TreeForge.git
+git clone https://github.com/ericbretz/TreeForge.git
 cd TreeForge
 ```
 
