@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://i.imgur.com/m3zp2j1.png" alt="Treeforge" width="1000">
+  <img src="https://i.imgur.com/lMrgrJG.png" alt="Treeforge" width="1000">
 </p>
 
 **Treeforge** is a pipeline for building phylogenetic trees from genomic data. This tool automates the phylogenomic workflow developed by Yang Y. and S.A. Smith. Treeforge combines several bioinformatics tools to do sequence alignment, clustering, tree building, and refinement. The whole process is automated and runs in steps, so, all you need to enter is a directory of .fasta files containing your genomic or transcriptomic sequences.
