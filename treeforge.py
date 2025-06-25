@@ -18,7 +18,7 @@ r: Skip Prank
 s: Skip Astral
 '''
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 class TreeForge:
     def __init__(self):
