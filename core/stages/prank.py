@@ -63,8 +63,11 @@ class Prank:
                 if node.is_leaf():
                     leaf_count += 1
                     parts = node.name.split('_')
-                    if len(parts) > 2:
-                        fasta_id = f"{parts[0]}_{parts[1]}@{'_'.join(parts[2:])}"
+                    if len(parts) >= 2:
+                        if len(parts) == 2:
+                            fasta_id = f"{parts[0]}@{parts[1]}"
+                        else:
+                            fasta_id = f"{parts[0]}_{parts[1]}@{'_'.join(parts[2:])}"
                         seq_mapping[fasta_id] = (tree.stem, node.name)
         created_files = set()
         

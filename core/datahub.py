@@ -4,6 +4,7 @@ import csv
 import shutil
 from pathlib             import Path
 from core.utils.decor    import bilge_crew, tree_crew
+from core.utils.contig   import Contig
 from glob                import glob
 from core.stages.blast   import Blast
 from core.stages.mcl     import MCL
@@ -41,9 +42,11 @@ class DataHub:
 
         # Directories and Files
         self.dir_base = Path(args.dir)                                                 # Input Base Directory
+        self.dir_temp_fasta = Path(os.path.join(self.dir_base, 'temp_fasta'))          # Temp Fasta Directory
         self.dir_treeforge = Path(os.path.join(self.dir_base, 'TreeForge'))            # TreeForge Directory
         self.files_fasta = [Path(f) for f in glob(os.path.join(self.dir_base, '*')) if f.endswith(tuple(['.fasta', '.fa', '.fas', '.fna']))] # List of FASTA files
-
+        self.files_fasta_renamed = [Path(f) for f in glob(os.path.join(self.dir_treeforge, 'temp_fasta', '*')) if f.endswith(tuple(['.fasta', '.fa', '.fas', '.fna']))] # List of renamed FASTA files
+        
         # master dictionary and skip flags
         self.master_dict = {}   # Master dictionary
         self._skip_check()      # Skip flags
@@ -78,7 +81,10 @@ class DataHub:
         self.dir_logs = Path(os.path.join(self.dir_treeforge, 'logs'))
 
         self.master_dict = {
-            'base'      : {'dir': Path(os.path.join(self.dir_treeforge, 'base')), 'fai': Path(os.path.join(self.dir_treeforge, 'fai'))},
+            'base'      : {'dir': Path(os.path.join(self.dir_treeforge, 'base')), 
+                           'fai': Path(os.path.join(self.dir_treeforge, 'fai')),
+                           'temp_fasta': Path(os.path.join(self.dir_treeforge, 'temp_fasta'))
+                           },
             'blast'     : {
                 'dir': Path(os.path.join(self.dir_treeforge, 'blast')),
                 'files': {
@@ -274,7 +280,8 @@ class DataHub:
 
     def _clutter_check(self):
         if self.save:
-            self.printout('error', 'Save flag is set, but no files will be saved')
+            self.printout('error', 'Cannot Save with Clutter flag set')
+            self.printout('error', 'Retaining files as safety measure')
             return
         if self.clutter:
             self.printout('metric', 'Removing Intermediate Files')
@@ -354,7 +361,15 @@ class DataHub:
         self.printout('metric', f'Metrics saved to {csv_file}')
         return flattened_dct
 
+    def _contig_renamer(self):
+        # self.printout('subtitle', 'Create Temp Fasta')
+        contig_renamer = Contig(self.dir_base, self.master_dict['base']['temp_fasta'])
+        self.renamed_map = contig_renamer.name_mapping
+        contig_renamer.rename_contigs(self.files_fasta)
+        return contig_renamer.return_dict
+    
     def run(self):
+        self._contig_renamer()
         self._execute('BLAST', self.blast, 'blast_skip')
         self._execute('MCL', self.mcl, 'mcl_skip')
         for i in range(self.iterations):
@@ -372,9 +387,11 @@ class DataHub:
     @bilge_crew()
     def blast(self):
         self.printout('subtitle', 'BLAST')
+        # Get the actual renamed files that were created by the contig renaming process
+        renamed_files = [Path(f) for f in glob(os.path.join(self.dir_treeforge, 'temp_fasta', '*')) if f.endswith(tuple(['.fasta', '.fa', '.fas', '.fna']))]
         blast = Blast(self.dir_base,                                         # Input Base Directory
                       self.dir_treeforge,                                    # TreeForge Directory
-                      self.files_fasta,                                      # List of FASTA files
+                      renamed_files,                                         # List of renamed FASTA files
                       self.master_dict['blast']['files']['concatenated'],    # Concatenated FASTA file
                       self.master_dict['blast']['files']['raw_blast'],       # Raw BLAST file
                       self.threads,                                          # Number of threads
@@ -430,7 +447,8 @@ class DataHub:
                     self.threads,                                                      # Number of threads
                     self.log,                                                          # Log level
                     self.hc,                                                           # Highlight color
-                    self.bc)                                                           # Background color
+                    self.bc,                                                           # Background color
+                    )                                                  # Renamed Map
         tree.run()
         return tree.return_dict
 
@@ -485,6 +503,7 @@ class DataHub:
         astral = Astral(self.master_dict['prank']['dir'],                               # PRANK Directory
                         self.master_dict['super']['dir'],                               # Supertree Directory
                         self.dir_treeforge,                                             # TreeForge Directory
+                        self.renamed_map,                                               # Renamed Map
                         self.threads,                                                   # Number of threads
                         self.log,                                                       # Log level
                         self.hc,                                                        # Highlight color

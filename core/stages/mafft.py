@@ -66,9 +66,6 @@ class Mafft:
 
         cln_file     = self.pxclsq(aln_file)
         iqtree_file  = self.iqtree(cln_file)
-        phyx_logfile = os.path.join(self.dir_base, "phyx.logfile")
-        if os.path.exists(phyx_logfile): 
-            os.remove(phyx_logfile)
 
         return_dict = {
             'aln_files': [aln_file],

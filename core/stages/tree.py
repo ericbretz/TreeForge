@@ -113,8 +113,7 @@ class Tree:
         with pysam.FastxFile(self.concatenated_fasta) as f:
             for entry in f:
                 seq_dict[entry.name] = entry.sequence
-                alt_name = entry.name.replace('@', '_')
-                seq_dict_alt[alt_name] = entry.sequence
+                seq_dict_alt[entry.name.replace('@', '_')] = entry.sequence
 
         written_files = []
         subtree_files = [f for f in os.listdir(current_iter_dir) if f.endswith('.subtree')]
@@ -124,13 +123,10 @@ class Tree:
         for filename in subtree_files:
             with open(os.path.join(current_iter_dir, filename), "r") as infile:
                 intree = parse(infile.readline())
-            
             cluster_id = get_clusterID(filename)
             outname = os.path.join(out_dir, f"{cluster_id}.fa")
-            
             labels = get_front_labels(intree)
             sequences_written = 0
-            
             with open(outname, "w") as outfile:
                 for label in labels:
                     if label in seq_dict:
@@ -139,12 +135,6 @@ class Tree:
                     elif label in seq_dict_alt:
                         outfile.write(f">{label}\n{seq_dict_alt[label]}\n")
                         sequences_written += 1
-                    else:
-                        alt_label = label.replace('_', '@')
-                        if alt_label in seq_dict:
-                            outfile.write(f">{label}\n{seq_dict[alt_label]}\n")
-                            sequences_written += 1
-            
             if sequences_written > 1:
                 written_files.append(outname)
                 total_sequences += sequences_written
