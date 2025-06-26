@@ -11,14 +11,15 @@ class Deps:
         self.printClass = PrintOut(log_level, hcolor, bcolor)
         self.printout   = self.printClass.printout
 
+        # Base dependencies
         self.deps = {
             'mafft'  : 'mafft',
             'mcl'    : 'mcl',
-            'blast'  : 'blastn',
             'prank'  : 'prank',
             'iqtree2': 'iqtree2',
             'pxcat'  : 'pxcat',
             'pxclsq' : 'pxclsq',
+            'blast'  : 'blastn',
         }
 
     def check_deps(self):

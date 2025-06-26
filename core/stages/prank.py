@@ -32,7 +32,9 @@ class Prank:
                  threads,
                  log,
                  hc,
-                 bc):
+                 bc,
+                 prank_pxclsq_threshold,
+                 bootstrap_replicates):
         self.dir_ortho1to1 = Path(dir_ortho1to1)
         self.dir_prank     = Path(dir_prank)
         self.infile_ending = infile_ending
@@ -42,6 +44,8 @@ class Prank:
         self.log           = log
         self.hc            = hc
         self.bc            = bc
+        self.prank_pxclsq_threshold = prank_pxclsq_threshold
+        self.bootstrap_replicates    = bootstrap_replicates
         self.return_dict   = {}
 
         self.printClass    = PrintOut(log, hc, bc)
@@ -77,11 +81,11 @@ class Prank:
                     tree_name, orig_name = seq_mapping[entry.name]
                     outfile_path = os.path.join(self.dir_prank, f"{tree_name}.fa")
                     mode = 'w' if outfile_path not in created_files else 'a'
-                    if '_' in orig_name:
-                        name_parts = orig_name.rsplit('_', 1)
-                        orig_name = name_parts[0]
-                    elif '@' in orig_name:
-                        orig_name = orig_name.split('@')[0]
+                    # if '_' in orig_name:
+                    #     name_parts = orig_name.rsplit('_', 1)
+                    #     orig_name = name_parts[0]
+                    # elif '@' in orig_name:
+                    #     orig_name = orig_name.split('@')[0]
                     with open(outfile_path, mode) as outfile:
                         outfile.write(f">{orig_name}\n{entry.sequence}\n")
                     if mode == 'w':
@@ -122,7 +126,7 @@ class Prank:
 
     def run_pxclsq_single(self, fas_file):
         out_file = fas_file.with_name(f"{fas_file.name}-cln")
-        cmd      = f"pxclsq -s {fas_file} -p 0.3 -o {out_file}"
+        cmd      = f"pxclsq -s {fas_file} -p {self.prank_pxclsq_threshold} -o {out_file}"
         pxclsq   = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         
         if pxclsq.returncode != 0:
@@ -132,7 +136,7 @@ class Prank:
 
     def run_iqtree_single(self, cln_file):
         threads_per_job = max(1, self.threads // 4)
-        cmd             = f"iqtree2 -s {cln_file} -nt {threads_per_job} -bb 1000 -redo -m GTR+G"
+        cmd             = f"iqtree2 -s {cln_file} -nt {threads_per_job} -bb {self.bootstrap_replicates} -redo -m GTR+G"
         iqtree          = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         
         if iqtree.returncode not in [0,2]:

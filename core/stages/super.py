@@ -12,7 +12,8 @@ class SuperMatrix:
                  threads,
                  log,
                  hcolor,
-                 bcolor):
+                 bcolor,
+                 super_bootstrap):
         self.dir_prank = dir_prank
         self.dir_super = dir_super
         self.dir_tf    = dir_tf
@@ -20,12 +21,13 @@ class SuperMatrix:
         self.log       = log
         self.hcolor    = hcolor
         self.bcolor    = bcolor
+        self.super_bootstrap = super_bootstrap
 
         self.intree          = os.path.join(self.dir_super, 'PrankAligned.treefile')
-        self.outtree         = os.path.join(self.dir_super, 'SuperMatrix.tree')
-        self.intree_renamed  = os.path.join(self.dir_super, 'PrankAlignedRenamed.tree')
-        self.outtree_renamed = os.path.join(self.dir_super, 'SuperMatrixRenamed.tree')
-        self.finaltree       = os.path.join(self.dir_tf,    'FinalTree.tree')
+        self.outtree         = os.path.join(self.dir_super, 'SuperMatrix.tre')
+        self.intree_renamed  = os.path.join(self.dir_super, 'PrankAlignedRenamed.tre')
+        self.outtree_renamed = os.path.join(self.dir_super, 'SuperMatrixRenamed.tre')
+        self.finaltree       = os.path.join(self.dir_tf,    'FinalTree.tre')
         self.s_matrix_dir    = os.path.join(self.dir_super, 'super.matrix')
         self.s_model_dir     = os.path.join(self.dir_super, 'super.model')
         self.cln_files       = ' '.join([os.path.join(self.dir_prank, f) for f in os.listdir(self.dir_prank) if f.endswith('.fas-cln')])
@@ -52,7 +54,7 @@ class SuperMatrix:
     def iqtree(self):
         self.printout('metric', 'IQ-TREE')
         file_dir    = os.path.join(self.dir_super, 'PrankAligned')
-        cmd         = f'iqtree2 -s {self.s_matrix_dir} -spp {self.s_model_dir} -nt {self.threads} -bb 1000 -m GTR+G -pre {file_dir} -redo'
+        cmd         = f'iqtree2 -s {self.s_matrix_dir} -spp {self.s_model_dir} -nt {self.threads} -bb {self.super_bootstrap} -m GTR+G -pre {file_dir} -redo'
         return_code = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if return_code.returncode != 0:
             self.printout('error', 'IQ-TREE failed')

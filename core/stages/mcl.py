@@ -20,7 +20,11 @@ class MCL:
                  threads,
                  log,
                  hc,
-                 bc):
+                 bc,
+                 mcl_inflation,
+                 perfect_identity,
+                 coverage_threshold,
+                 min_seq_length):
         self.printClass         = PrintOut(log, hc, bc)
         self.printout           = self.printClass.printout
         self.dir_base           = dir_base
@@ -35,9 +39,13 @@ class MCL:
         self.log                = log
         self.hc                 = hc
         self.bc                 = bc
+        self.mcl_inflation      = mcl_inflation
+        self.perfect_identity   = perfect_identity
+        self.coverage_threshold = coverage_threshold
+        self.min_seq_length     = min_seq_length
     
         self.blast_mcl_out      = Path(os.path.join(self.dir_mcl, self.files_raw_blast.with_suffix(f'.hit-frac{self.hit_frac_cutoff}.minusLogEvalue').name))
-        self.mcl_out            = Path(os.path.join(self.dir_mcl, self.files_raw_blast.with_suffix(f'.hit-frac{self.hit_frac_cutoff}_I1.4_e5').name))
+        self.mcl_out            = Path(os.path.join(self.dir_mcl, self.files_raw_blast.with_suffix(f'.hit-frac{self.hit_frac_cutoff}_I{self.mcl_inflation}_e5').name))
         self.ident_out          = Path(os.path.join(self.dir_mcl, self.files_raw_blast.with_suffix(f'.ident').name))
         self.mcl_count          = 0
 
@@ -99,9 +107,9 @@ class MCL:
                 qlen, qstart, qend = map(float, (spls[1], spls[10], spls[11]))
                 slen, sstart, send = map(float, (spls[3], spls[12], spls[13]))
                 
-                if pident == 100.0 and query_taxon != hit_taxon:
-                    if (abs(qend - qstart) / qlen >= 0.9 or abs(send - sstart) / slen >= 0.9) and \
-                       qlen >= 300 and slen >= 300:
+                if pident == self.perfect_identity and query_taxon != hit_taxon:
+                    if (abs(qend - qstart) / qlen >= self.coverage_threshold or abs(send - sstart) / slen >= self.coverage_threshold) and \
+                       qlen >= self.min_seq_length and slen >= self.min_seq_length:
                         ident_file.write(line)
                 
                 hit_key = (query, hit)
@@ -132,7 +140,7 @@ class MCL:
     def mcl(self):
         """Run MCL."""
         self.printout('metric', 'MCL')
-        cmd = f"mcl {self.blast_mcl_out} --abc -te {self.threads} -tf 'gq(5)' -I 1.4 -o {self.mcl_out}"
+        cmd = f"mcl {self.blast_mcl_out} --abc -te {self.threads} -tf 'gq(5)' -I {self.mcl_inflation} -o {self.mcl_out}"
         mcl = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         if mcl.returncode != 0:
             self.printout('error', 'MCL failed')

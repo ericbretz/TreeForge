@@ -127,8 +127,16 @@ class PrintOut:
             'super_time'              : 'Super Time',
             # Astral
             'concat_tree'             : 'Concat Tree',
+            'gene_trees'              : 'Gene Trees',
             'finaltree'               : 'Final Tree',
             'num_trees'               : '# Trees',
+            # Contig
+            'file'                    : 'File',
+            'nucleotide_sequences'    : 'Nucleotide Seq',
+            'protein_sequences'       : 'Protein Seq',
+            'translated_sequences'    : 'Translated Seq',
+            'files_processed'         : 'Files Processed',
+            'name_mappings'           : 'Name Mappings',
         }
 
     def fmt_key(self, key: str) -> str:
@@ -229,6 +237,8 @@ class PrintOut:
                     print(f"{color}{str(line):^{width}}\033[0m")
         elif isinstance(metric, dict):
             for key, value in metric.items():
+                if key not in self.key_translate:
+                    continue
                 metric_str = self.fmt_str(f'    {self.fmt_key(key)}', value=False)
                 metric_str = f'{metric_str:<20}│'
                 value_str  = self.fmt_str(str(value), value=True)

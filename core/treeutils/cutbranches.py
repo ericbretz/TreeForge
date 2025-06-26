@@ -11,7 +11,8 @@ class CutBranches:
 				tree_ending,
 				min_taxa,
 				cutoff,
-				hcolor):
+				hcolor,
+				min_subtree_taxa):
 
 		self.dir_tree    = Path(dir_tree)
 		self.dir_trimmed = Path(dir_trimmed)
@@ -20,6 +21,7 @@ class CutBranches:
 		self.min_taxa    = min_taxa
 		self.cutoff      = cutoff
 		self.hcolor      = hcolor
+		self.min_subtree_taxa = min_subtree_taxa
 		self.error_count = 0
 		self.error_dict  = {'insufficient_taxa': 0, 'no_branches_cut': 0}
 		self.total_counts = {
@@ -117,7 +119,7 @@ class CutBranches:
 				valid_subtrees = 0
 				for i, subtree in enumerate(subtrees, 1):
 					subtree_taxa = self.count_taxa(subtree)
-					if subtree_taxa >= 4:
+					if subtree_taxa >= self.min_subtree_taxa:
 						valid_subtrees += 1
 						if subtree.nchildren == 2:
 							temp, subtree = remove_kink(subtree, subtree)
@@ -173,9 +175,9 @@ class CutBranches:
 				child0,child1 = node.children[0],node.children[1]
 				if node.length > cutoff:
 					if not child0.istip and not child1.istip and child0.length+child1.length>cutoff:
-						if self.count_taxa(child0) >= 4:
+						if self.count_taxa(child0) >= self.min_subtree_taxa:
 							subtrees.append(child0)
-						if self.count_taxa(child1) >= 4:
+						if self.count_taxa(child1) >= self.min_subtree_taxa:
 							subtrees.append(child1)						
 					else: subtrees.append(node)
 					node = node.prune()
@@ -183,6 +185,6 @@ class CutBranches:
 						node,curroot = remove_kink(node,curroot)
 						going = True
 					break
-		if self.count_taxa(curroot) >= 4:
+		if self.count_taxa(curroot) >= self.min_subtree_taxa:
 			subtrees.append(curroot)
 		return subtrees

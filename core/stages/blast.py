@@ -4,13 +4,15 @@ import pysam
 from core.utils.printout import PrintOut
 
 class Blast:
-    def __init__(self, dir_base, dir_treeforge, files_fasta, files_concatenated, files_raw_blast, threads, log, hc, bc):
+    def __init__(self, dir_base, dir_treeforge, files_fasta, files_concatenated, files_raw_blast, threads, log, hc, bc, blast_evalue, blast_max_targets):
         self.dir_base           = dir_base
         self.dir_treeforge      = dir_treeforge
         self.files_fasta        = files_fasta
         self.files_concatenated = files_concatenated
         self.files_raw_blast    = files_raw_blast
         self.threads            = threads
+        self.blast_evalue       = blast_evalue
+        self.blast_max_targets  = blast_max_targets
         self.contig_count       = 0
         self.return_dict = {'contig_count': self.contig_count}
         self.printClass = PrintOut(log, hc, bc)
@@ -58,7 +60,7 @@ class Blast:
         Run BLAST all-by-all search.
         '''
         self.printout('metric', 'All-by-All Comparison')
-        cmd   = f'blastn -db {self.files_concatenated} -query {self.files_concatenated} -evalue 10 -num_threads {self.threads} -max_target_seqs 1000 -out {self.files_raw_blast} -outfmt "6 qseqid qlen sseqid slen frames pident nident length mismatch gapopen qstart qend sstart send evalue bitscore"'
+        cmd   = f'blastn -db {self.files_concatenated} -query {self.files_concatenated} -evalue {self.blast_evalue} -num_threads {self.threads} -max_target_seqs {self.blast_max_targets} -out {self.files_raw_blast} -outfmt "6 qseqid qlen sseqid slen frames pident nident length mismatch gapopen qstart qend sstart send evalue bitscore"'
         blast = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         if blast.returncode != 0:
             self.printout('error', 'BLAST blastn failed')

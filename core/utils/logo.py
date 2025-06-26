@@ -53,18 +53,55 @@ def print_logo(version):
 def print_help(hcolor):
     """Print help info in formatted box."""
     help_lines = [
-        '--dir/-d                 DIR         Directory of FASTA files',
-        '--iter/-i                INT         Number of iterations',
-        '--threads/-t             INT         Number of threads',
-        '--hit-frac-cutoff/-f     FLOAT       Hit fraction cutoff',
-        '--minimum-taxa/-m        INT         Minimum taxa for MCL clustering',
-        '--orthocutoff/-o         FLOAT       Ortholog Minimum Taxa Cutoff',
-        '--seqtype/-s             STR         Sequence type',
-        '--clutter/-c             STR         Remove Intermediate Files'
+        'BASIC PARAMETERS:',
+        '--dir/-d                       DIR     Directory of FASTA files    (./)',
+        '--iter/-i                      INT     Number of iterations        (3)',
+        '--threads/-t                   INT     Number of threads           (2)',
+        '--clutter/-c                   BOOL    Remove Intermediate Files   (False)',
+        '',
+        'BLAST STAGE:',
+        '--blast-evalue/-be             FLOAT   BLAST E-value threshold     (10.0)',
+        '--blast-max-targets/-bm        INT     BLAST max target seqs       (1000)',
+        '',
+        'MCL STAGE:',
+        '--mcl-hit-frac-cutoff/-hf      FLOAT   Hit fraction cutoff         (0.3)',
+        '--mcl-minimum-taxa/-mt         INT     Min taxa for MCL            (10)',
+        '--mcl-inflation/-mi            FLOAT   MCL inflation param         (1.4)',
+        '--mcl-perfect-identity/-mp     FLOAT   Perfect identity            (100.0)',
+        '--mcl-coverage-threshold/-mc   FLOAT   Coverage threshold          (0.9)',
+        '--mcl-min-seq-length/-ml       INT     Min seq length              (300)',
+        '',
+        'MAFFT STAGE:',
+        '--mafft-maxiter/-mm            INT     MAFFT max iterations        (1000)',
+        '--mafft-pxclsq-threshold/-mx   FLOAT   pxclsq prob threshold       (0.1)',
+        '--mafft-thread-divisor/-md     INT     Thread division factor      (4)',
+        '',
+        'TREE STAGE:',
+        '--tree-relative-cutoff/-tr     FLOAT   Rel cutoff for trim tips    (0.2)',
+        '--tree-absolute-cutoff/-ta     FLOAT   Abs cutoff for trim tips    (0.3)',
+        '--tree-branch-cutoff/-tb       FLOAT   Branch cutoff               (0.02)',
+        '--tree-mask-paralogs/-tm       STR     Mask paraphyletic tips      (y/n, n)',
+        '--tree-outlier-ratio/-to       FLOAT   Outlier ratio threshold     (20.0)',
+        '--tree-max-trim-iterations/-ti INT     Max trim iterations         (10)',
+        '--tree-min-subtree-taxa/-ts    INT     Min taxa for subtrees       (4)',
+        '--tree-min-leaves/-tl          INT     Min leaves for tree         (4)',
+        '',
+        'PRUNE STAGE:',
+        '--prune-orthocutoff/-po        INT     Ortho min taxa cutoff       (20)',
+        '--prune-relative-cutoff/-pr    FLOAT   Rel tip cutoff for prune    (0.2)',
+        '--prune-absolute-cutoff/-pa    FLOAT   Abs tip cutoff for prune    (0.3)',
+        '',
+        'PRANK STAGE:',
+        '--prank-seqtype/-ps            STR     PRANK seq type            (dna/aa, aa)',
+        '--prank-pxclsq-threshold/-pp   FLOAT   pxclsq prob threshold       (0.3)',
+        '--prank-bootstrap/-pb          INT     IQ-TREE bootstraps          (1000)',
+        # '',
+        # 'SUPER STAGE:',
+        # '--super-bootstrap/-sb    INT         Supermatrix bootstraps (1000)',
     ]
     draw_box(help_lines, hcolor)
 
-def print_args(args, hcolor):
+def print_args(args, hcolor, passed_args):
     """Print command line args in formatted box."""
     skip_map = {
         'b': 'BLAST', 'm': 'MCL', 'a': 'MAFFT', 't': 'Tree',
@@ -73,29 +110,80 @@ def print_args(args, hcolor):
     
     dir_path = str(os.getcwd())[-30:] if not args.dir else ('..' + args.dir[-38:] if len(args.dir) > 40 else args.dir)
     
-    arg_lines = [
-        f'Directory:                       {dir_path}',
-        f'Iterations:                      {args.iter}',
-        f'Threads:                         {args.threads}',
-        f'Hit fraction cutoff:             {args.hit_frac_cutoff}',
-        f'Minimum taxa:                    {args.minimum_taxa}',
-        f'Ortholog Minimum Taxa Cutoff:    {args.orthocutoff}',
-        f'Sequence type:                   {args.seqtype}'
-    ]
+    # Define argument mappings for each stage
+    arg_mappings = {
+        'BASIC:': {
+            'dir': [f'Directory:', dir_path],
+            'iter': [f'Iterations:', args.iter],
+            'threads': [f'Threads:', args.threads],
+            'clutter': [f'Clutter:', args.clutter],
+        },
+        'BLAST:': {
+            'blast_evalue': [f'E-value:', args.blast_evalue],
+            'blast_max_targets': [f'Max targets:', args.blast_max_targets],
+        },
+        'MCL:': {
+            'mcl_hit_frac_cutoff': [f'Hit fraction cutoff:', args.mcl_hit_frac_cutoff],
+            'mcl_minimum_taxa': [f'Minimum taxa:', args.mcl_minimum_taxa],
+            'mcl_inflation': [f'Inflation:', args.mcl_inflation],
+            'mcl_perfect_identity': [f'Perfect identity:', args.mcl_perfect_identity],
+            'mcl_coverage_threshold': [f'Coverage threshold:', args.mcl_coverage_threshold],
+            'mcl_min_seq_length': [f'Min sequence length:', args.mcl_min_seq_length],
+        },
+        'MAFFT:': {
+            'mafft_maxiter': [f'Max iterations:', args.mafft_maxiter],
+            'mafft_pxclsq_threshold': [f'pxclsq threshold:', args.mafft_pxclsq_threshold],
+            'mafft_thread_divisor': [f'Thread divisor:', args.mafft_thread_divisor],
+        },
+        'TREE:': {
+            'tree_relative_cutoff': [f'Relative cutoff:', args.tree_relative_cutoff],
+            'tree_absolute_cutoff': [f'Absolute cutoff:', args.tree_absolute_cutoff],
+            'tree_branch_cutoff': [f'Branch cutoff:', args.tree_branch_cutoff],
+            'tree_mask_paralogs': [f'Mask paralogs:', args.tree_mask_paralogs],
+            'tree_outlier_ratio': [f'Outlier ratio:', args.tree_outlier_ratio],
+            'tree_max_trim_iterations': [f'Max trim iterations:', args.tree_max_trim_iterations],
+            'tree_min_subtree_taxa': [f'Min subtree taxa:', args.tree_min_subtree_taxa],
+            'tree_min_leaves': [f'Min leaves:', args.tree_min_leaves],
+        },
+        'PRUNE:': {
+            'prune_orthocutoff': [f'Orthocutoff:', args.prune_orthocutoff],
+            'prune_relative_cutoff': [f'Relative cutoff:', args.prune_relative_cutoff],
+            'prune_absolute_cutoff': [f'Absolute cutoff:', args.prune_absolute_cutoff],
+        },
+        'PRANK:': {
+            'prank_seqtype': [f'Sequence type:', args.prank_seqtype],
+            'prank_pxclsq_threshold': [f'pxclsq threshold:', args.prank_pxclsq_threshold],
+            'prank_bootstrap': [f'Bootstrap replicates:', args.prank_bootstrap],
+        },
+    }
     
+    # Build args_list based on passed_args
+    args_list = []
+    for stage, arg_dict in arg_mappings.items():
+        stage_args = [f'  {v[0]:<33} {v[1]}' for k, v in arg_dict.items() if k in passed_args]
+        
+        if stage_args:  # Only add stage if it has arguments to display
+            # args_list.append('')
+            args_list.append(stage)
+            args_list.extend(stage_args)
+
     if args.SKIP != '-':
         skipped_stages = [skip_map[x] for x in args.SKIP]
         if len(skipped_stages) > 4:
             mid_point = (len(skipped_stages) + 1) // 2
             first_row = ', '.join(skipped_stages[:mid_point])
             second_row = ', '.join(skipped_stages[mid_point:])
-            arg_lines.append(f'Skipped:                         {first_row}')
-            arg_lines.append(f'                                 {second_row}')
+            # args_list.append('')
+            args_list.append('SKIPPED STAGES:')
+            args_list.append(f'                                 {first_row}')
+            args_list.append(f'                                 {second_row}')
         else:
             skipped = ', '.join(skipped_stages)
-            arg_lines.append(f'Skipped:                         {skipped}')
+            # args_list.append('')
+            args_list.append('SKIPPED STAGES:')
+            args_list.append(f'                                 {skipped}')
     
-    draw_box(arg_lines, hcolor)
+    draw_box(args_list, hcolor)
 
 if __name__ == "__main__":
     hcolor, bcolor = print_logo("11110.1.0")

@@ -26,7 +26,10 @@ class Mafft:
                  threads,
                  log,
                  hc,
-                 bc):
+                 bc,
+                 mafft_maxiter,
+                 pxclsq_threshold,
+                 thread_divisor):
 
         self.dir_base           = dir_base
         self.dir_iteration      = dir_iteration
@@ -34,6 +37,9 @@ class Mafft:
         self.log                = log
         self.hc                 = hc
         self.bc                 = bc
+        self.mafft_maxiter      = mafft_maxiter
+        self.pxclsq_threshold   = pxclsq_threshold
+        self.thread_divisor     = thread_divisor
         self.printClass         = PrintOut(log, hc, bc)
         self.printout           = self.printClass.printout
 
@@ -45,8 +51,18 @@ class Mafft:
         self.return_dict        = {}
 
     def run(self):
-        self.max_workers = min(self.threads // 4, len(self.fasta_files))
-        self.threads_per_job = max(4, self.threads // max(1, self.max_workers))
+        self.max_workers = max(1, min(self.threads // self.thread_divisor, len(self.fasta_files)))
+        self.threads_per_job = max(self.thread_divisor, self.threads // max(1, self.max_workers))
+        
+        if not self.fasta_files:
+            self.printout('info', 'No .fa files found to process')
+            self.return_mafft({
+                'aln_files': [],
+                'cln_files': [],
+                'iqtree_files': []
+            })
+            sys.exit(1)
+            
         results = self.mafft_thread()
         self.return_mafft(results)
         return self.return_dict
@@ -55,7 +71,7 @@ class Mafft:
 
         aln_file = fasta_file.replace('.fa', '.aln')
         self.aln_files.append(aln_file)
-        cmd = f'mafft --auto --maxiterate 1000 --thread {self.threads_per_job} {fasta_file}'
+        cmd = f'mafft --auto --maxiterate {self.mafft_maxiter} --thread {self.threads_per_job} {fasta_file}'
         mafft = subprocess.run(cmd, stdout=open(aln_file, 'w'), stderr=subprocess.PIPE, shell=True)
         if mafft.returncode != 0:
             self.printout('error', 'Mafft failed')
@@ -102,7 +118,7 @@ class Mafft:
     def pxclsq(self, aln_file):
         cln_file = aln_file.replace('.aln', '.cln')
         self.cln_files.append(cln_file)
-        cmd = f'pxclsq -s {aln_file} -p 0.1 -o {cln_file}'
+        cmd = f'pxclsq -s {aln_file} -p {self.pxclsq_threshold} -o {cln_file}'
         pxclsq = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         if pxclsq.returncode != 0:
             self.printout('error', 'Pxclsq failed')

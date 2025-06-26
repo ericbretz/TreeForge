@@ -99,6 +99,31 @@ def bilge_crew(save_flag=None) -> Callable[..., Any]:
             if not datahub or not hasattr(datahub, '__class__') or datahub.__class__.__name__ != 'DataHub':
                 return func(*args, **kwargs)
             
+            def print_nested_dict(d, exclude_keys=None):
+                """Print nested dict as sorted list, excluding certain keys."""
+                if exclude_keys is None:
+                    exclude_keys = set()
+                
+                result = []
+                for key, value in sorted(d.items()):
+                    if key in exclude_keys:
+                        continue
+                    if isinstance(value, dict):
+                        for nested_key, nested_value in sorted(value.items()):
+                            if isinstance(nested_value, (str, int, float, bool)):
+                                result.append((nested_key, nested_value))
+                            elif isinstance(nested_value, list):
+                                result.append((nested_key, len(nested_value)))
+                    elif isinstance(value, (str, int, float, bool)):
+                        if key not in datahub.printClass.key_translate:
+                            continue
+                        result.append((key, value))
+                    elif isinstance(value, list):
+                        if key not in datahub.printClass.key_translate:
+                            continue
+                        result.append((key, len(value)))
+                return result
+            
             initial_files, initial_dirs = get_filesystem_state(datahub.dir_treeforge)
             
             start_time = time.time()
@@ -137,17 +162,48 @@ def bilge_crew(save_flag=None) -> Callable[..., Any]:
             
             # Save to master dictionary
             should_save = save_flag if save_flag is not None else getattr(datahub, 'save', True)
-            if should_save:
-                step_name = original_func.__name__
-                update_dict(datahub, step_name, result, execution_time)
+            
+            # Always update the master dictionary and print metrics, regardless of save flag
+            step_name = original_func.__name__
+            update_dict(datahub, step_name, result, execution_time)
+            
+            # Handle iteration steps
+            if step_name.lower() in ['mafft', 'tree']:
+                iter_key = f'iter_{datahub.current_iter}'
+                datahub.printout('metric', datahub.master_dict[iter_key][step_name.lower()])
+            else:
+                # Use the same filtering logic as _prev_print
+                metrics = datahub.master_dict[step_name.lower()]
                 
-                # Handle iteration steps
-                if step_name.lower() in ['mafft', 'tree']:
-                    iter_key = f'iter_{datahub.current_iter}'
-                    datahub.printout('metric', datahub.master_dict[iter_key][step_name.lower()])
+                if step_name.lower() == 'blast':
+                    blast_metrics = print_nested_dict(metrics, exclude_keys={'files'})
+                    if blast_metrics:
+                        datahub.printout('metric', blast_metrics)
+                elif step_name.lower() == 'mcl':
+                    mcl_metrics = print_nested_dict(metrics)
+                    if mcl_metrics:
+                        datahub.printout('metric', mcl_metrics)
+                elif step_name.lower() == 'prune':
+                    if 'prune' in metrics:
+                        prune_metrics = print_nested_dict(metrics['prune'])
+                        if prune_metrics:
+                            datahub.printout('metric', prune_metrics)
+                elif step_name.lower() == 'prank':
+                    prank_metrics = print_nested_dict(metrics)
+                    if prank_metrics:
+                        datahub.printout('metric', prank_metrics)
+                elif step_name.lower() == 'astral':
+                    astral_metrics = print_nested_dict(metrics)
+                    if astral_metrics:
+                        datahub.printout('metric', astral_metrics)
                 else:
-                    datahub.printout('metric', datahub.master_dict[step_name.lower()])
-                
+                    # Default case for other steps
+                    filtered_metrics = print_nested_dict(metrics)
+                    if filtered_metrics:
+                        datahub.printout('metric', filtered_metrics)
+            
+            # Only save to JSON if should_save is True
+            if should_save:
                 # Save to JSON
                 datahub.dir_logs.mkdir(parents=True, exist_ok=True)
                 serializable_dict = convert_paths(datahub.master_dict)

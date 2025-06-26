@@ -22,7 +22,15 @@ class Tree:
                  threads,
                  log,
                  hc,
-                 bc):
+                 bc,
+                 relative_cutoff,
+                 absolute_cutoff,
+                 branch_cutoff,
+                 mask_paralogs,
+                 outlier_ratio,
+                 max_trim_iterations,
+                 min_subtree_taxa,
+                 min_tree_leaves):
         
         self.dir_base           = dir_base
         self.dir_treeforge      = dir_treeforge
@@ -40,11 +48,15 @@ class Tree:
         self.bc                 = bc
 
         self.tree_ending     = '.treefile'   # Tree ending
-        self.relative_cutoff = 0.2           # Relative cutoff
-        self.absolute_cutoff = 0.3           # Absolute cutoff
-        self.branch_cutoff   = 0.02          # Branch cutoff
-        self.para            = 'n'           # Run Paralogs
+        self.relative_cutoff = relative_cutoff           # Relative cutoff
+        self.absolute_cutoff = absolute_cutoff           # Absolute cutoff
+        self.branch_cutoff   = branch_cutoff          # Branch cutoff
+        self.para            = mask_paralogs           # Run Paralogs
         self.contig_dct      = {}            # Contig dictionary
+        self.outlier_ratio   = outlier_ratio           # Ratio threshold for outlier detection
+        self.max_trim_iterations = max_trim_iterations # Maximum trimming iterations
+        self.min_subtree_taxa = min_subtree_taxa       # Minimum taxa for valid subtrees
+        self.min_tree_leaves = min_tree_leaves         # Minimum leaves for valid tree
 
         self.printClass         = PrintOut(log, hc, bc)
         self.printout           = self.printClass.printout
@@ -66,7 +78,10 @@ class Tree:
                              self.relative_cutoff,
                              self.absolute_cutoff,
                              self.contig_dct,
-                             self.hc)
+                             self.hc,
+                             self.outlier_ratio,
+                             self.max_trim_iterations,
+                             self.min_tree_leaves)
         result = trim_tips.run()
         self.printout('metric', result)
         self.return_dict['trim_tips'] = result
@@ -78,7 +93,8 @@ class Tree:
                              self.dir_mafft,
                              self.para,
                              self.tree_ending,
-                             self.hc)
+                             self.hc,
+                             self.min_tree_leaves)
         result = mask_tips.run()
         self.printout('metric', result)
         self.return_dict['mask_tips'] = result
@@ -91,7 +107,8 @@ class Tree:
                                    '.mm',
                                    self.minimum_taxa,
                                    self.branch_cutoff,
-                                   self.hc)
+                                   self.hc,
+                                   self.min_subtree_taxa)
         result = cut_branches.run()
         self.printout('metric', result)
         self.return_dict['cut_branches'] = result
@@ -139,6 +156,7 @@ class Tree:
                 written_files.append(outname)
                 total_sequences += sequences_written
                 files_written += 1
-            metric = {'written_files': written_files, 'total_sequences': total_sequences, 'files_written': files_written}
-            self.printout('metric', metric)
-            self.return_dict['write_tree'] = metric
+        
+        metric = {'written_files': written_files, 'total_sequences': total_sequences, 'files_written': files_written}
+        self.printout('metric', metric)
+        self.return_dict['write_tree'] = metric
