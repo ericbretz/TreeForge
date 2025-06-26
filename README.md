@@ -49,14 +49,47 @@ python treeforge.py -d /path/to/fasta/files
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
+| **Basic Parameters** | | | |
 | `--dir` | `-d` | Directory containing FASTA files | Current directory |
 | `--iter` | `-i` | Number of MAFFT/Tree iterations | 3 |
 | `--threads` | `-t` | Number of threads for parallel processing | 2 |
-| `--hit-frac-cutoff` | `-f` | Hit fraction cutoff for MCL clustering | 0.3 |
-| `--minimum-taxa` | `-m` | Minimum taxa for MCL clustering | 10 |
-| `--orthocutoff` | `-o` | Ortholog minimum taxa cutoff | 20 |
-| `--seqtype` | `-s` | Sequence type (`dna` or `aa`) | `aa` |
 | `--clutter` | `-c` | Remove intermediate files after completion | False |
+| **BLAST Stage** | | | |
+| `--blast-evalue` | `-be` | BLAST E-value threshold | 10.0 |
+| `--blast-max-targets` | `-bm` | BLAST max target sequences | 1000 |
+| **MCL Stage** | | | |
+| `--mcl-hit-frac-cutoff` | `-hf` | Hit fraction cutoff for MCL clustering | 0.3 |
+| `--mcl-minimum-taxa` | `-mt` | Minimum taxa for MCL clustering | 10 |
+| `--mcl-inflation` | `-mi` | MCL inflation parameter | 1.4 |
+| `--mcl-perfect-identity` | `-mp` | Perfect identity threshold | 100.0 |
+| `--mcl-coverage-threshold` | `-mc` | Coverage threshold for identical sequences | 0.9 |
+| `--mcl-min-seq-length` | `-ml` | Minimum sequence length | 300 |
+| **MAFFT Stage** | | | |
+| `--mafft-maxiter` | `-mm` | MAFFT max iterations | 1000 |
+| `--mafft-pxclsq-threshold` | `-mx` | pxclsq probability threshold (MAFFT) | 0.1 |
+| `--mafft-thread-divisor` | `-md` | Thread division factor | 4 |
+| **Tree Stage** | | | |
+| `--tree-relative-cutoff` | `-tr` | Relative cutoff for trimming tips | 0.2 |
+| `--tree-absolute-cutoff` | `-ta` | Absolute cutoff for trimming tips | 0.3 |
+| `--tree-branch-cutoff` | `-tb` | Branch cutoff for cutting branches | 0.02 |
+| `--tree-mask-paralogs` | `-tm` | Mask paraphyletic tips (y/n) | n |
+| `--tree-outlier-ratio` | `-to` | Ratio threshold for outlier detection | 20.0 |
+| `--tree-max-trim-iterations` | `-ti` | Maximum trimming iterations | 10 |
+| `--tree-min-subtree-taxa` | `-ts` | Minimum taxa for valid subtrees | 4 |
+| `--tree-min-leaves` | `-tl` | Minimum leaves for valid tree | 4 |
+| **Prune Stage** | | | |
+| `--prune-orthocutoff` | `-po` | Ortholog minimum taxa cutoff | 20 |
+| `--prune-relative-cutoff` | `-pr` | Relative tip cutoff for pruning | 0.2 |
+| `--prune-absolute-cutoff` | `-pa` | Absolute tip cutoff for pruning | 0.3 |
+| **PRANK Stage** | | | |
+| `--prank-seqtype` | `-ps` | Sequence type for PRANK (dna/aa) | aa |
+| `--prank-pxclsq-threshold` | `-pp` | pxclsq probability threshold (PRANK) | 0.3 |
+| `--prank-bootstrap` | `-pb` | IQ-TREE bootstrap replicates | 1000 |
+| **Super Stage** | | | |
+| `--super-bootstrap` | `-sb` | Supermatrix bootstrap replicates | 1000 |
+| **Utility** | | | |
+| `--version` | `-v` | Print version | - |
+| `--log` | `-l` | Log level (0-4) | 3 |
 
 <h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Examples</h2>
 
@@ -67,7 +100,7 @@ python treeforge.py -d /path/to/sequences
 
 #### Custom parameters for DNA sequences:
 ```bash
-python treeforge.py -d /path/to/sequences -i 5 -t 8 -f 0.4 -m 15 -o 25 -s aa
+python treeforge.py -d /path/to/sequences -i 5 -t 8 -hf 0.4 -mt 15 -po 25 -ps aa
 ```
 
 #### Clean Clutter (remove intermediate files):

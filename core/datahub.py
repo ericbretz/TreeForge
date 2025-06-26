@@ -25,12 +25,48 @@ class DataHub:
         self.threads         = args.threads                     # Number of threads
 
         # Tool Parameters
-        self.hit_frac_cutoff = args.hit_frac_cutoff             # Hit fraction cutoff
-        self.minimum_taxa    = args.minimum_taxa                # Minimum taxa for MCL clustering
-        self.orthocutoff     = args.orthocutoff                 # Ortholog Minimum Taxa Cutoff
-        self.seqtype         = args.seqtype           
+        self.hit_frac_cutoff = args.mcl_hit_frac_cutoff             # Hit fraction cutoff
+        self.minimum_taxa    = args.mcl_minimum_taxa                # Minimum taxa for MCL clustering
+        self.orthocutoff     = args.prune_orthocutoff               # Ortholog Minimum Taxa Cutoff
+        self.seqtype         = args.prank_seqtype                   # Sequence type
         
-        # Terminal          # Sequence type
+        # BLAST Stage Parameters
+        self.blast_evalue        = args.blast_evalue            # BLAST E-value threshold
+        self.blast_max_targets   = args.blast_max_targets       # BLAST max target sequences
+        
+        # MCL Stage Parameters
+        self.mcl_inflation       = args.mcl_inflation           # MCL inflation parameter
+        self.perfect_identity    = args.mcl_perfect_identity        # Perfect identity threshold
+        self.coverage_threshold  = args.mcl_coverage_threshold      # Coverage threshold for identical sequences
+        self.min_seq_length      = args.mcl_min_seq_length          # Minimum sequence length
+        
+        # MAFFT Stage Parameters
+        self.mafft_maxiter       = args.mafft_maxiter           # MAFFT max iterations
+        self.pxclsq_threshold    = args.mafft_pxclsq_threshold  # pxclsq probability threshold (MAFFT)
+        self.thread_divisor      = args.mafft_thread_divisor    # Thread division factor
+        
+        # Tree Stage Parameters
+        self.relative_cutoff     = args.tree_relative_cutoff         # Relative cutoff for trimming tips
+        self.absolute_cutoff     = args.tree_absolute_cutoff         # Absolute cutoff for trimming tips
+        self.branch_cutoff       = args.tree_branch_cutoff           # Branch cutoff for cutting branches
+        self.mask_paralogs       = args.tree_mask_paralogs           # Mask paraphyletic tips
+        self.outlier_ratio       = args.tree_outlier_ratio           # Ratio threshold for outlier detection
+        self.max_trim_iterations = args.tree_max_trim_iterations     # Maximum trimming iterations
+        self.min_subtree_taxa    = args.tree_min_subtree_taxa        # Minimum taxa for valid subtrees
+        self.min_tree_leaves     = args.tree_min_leaves              # Minimum leaves for valid tree
+        
+        # Prune Stage Parameters
+        self.prune_relative_cutoff = args.prune_relative_cutoff # Relative tip cutoff for pruning
+        self.prune_absolute_cutoff = args.prune_absolute_cutoff # Absolute tip cutoff for pruning
+        
+        # PRANK Stage Parameters
+        self.prank_pxclsq_threshold = args.prank_pxclsq_threshold # pxclsq probability threshold (PRANK)
+        self.bootstrap_replicates    = args.prank_bootstrap   # IQ-TREE bootstrap replicates
+        
+        # Super Stage Parameters
+        self.super_bootstrap     = args.super_bootstrap         # Supermatrix bootstrap replicates
+        
+        # Terminal Parameters
         self.hc              = args.highlight_color             # Highlight color
         self.bc              = args.background_color            # Background color
         self.log             = args.log                         # Log level
@@ -112,7 +148,10 @@ class DataHub:
             }
 
     def _load_previous(self) -> None:
-        """Load data from previous run."""
+        """Load data from previous run.
+        This will require dev flags to be set.
+        I'm not sure that the save/load functionality works correctly but it's a start.
+        Suppose i'm really the only one that needs to know about this."""
         skip_mapping = {
             'b': 'blast',
             'm': 'mcl',
@@ -143,7 +182,7 @@ class DataHub:
                     self.master_dict[step] = prev_data[step]
 
     def _make_dirs(self):
-        """Create all required directories."""
+        """Create all the directories."""
         def create_dirs(d: dict):
             for key, value in d.items():
                 if isinstance(value, dict):
@@ -154,7 +193,8 @@ class DataHub:
         create_dirs(self.master_dict)
 
     def _prev_print(self, step_name):
-        """Print metrics from previous run."""
+        """Print metrics from previous run.
+        More dev stuff."""
         
         def print_nested_dict(d, exclude_keys=None):
             """Print nested dict as sorted list, excluding certain keys."""
@@ -272,6 +312,8 @@ class DataHub:
                         self.printout('metric', astral_metrics)
 
     def _execute(self, step_name, step_method, skip_flag):
+        """Check that a step isnt being skipped before running it.
+        Even more dev stuff."""
         if not getattr(self, skip_flag, False):
             return step_method()
         self.printout('subtitle', f'{step_name} Skipped')
@@ -279,6 +321,9 @@ class DataHub:
         return {'status': 'skipped'}
 
     def _clutter_check(self):
+        """Check that the clutter flag is not set when the save flag is set.
+        If clutter is set and save is not set, remove all intermediate files.
+        save flag is a dev flag so shouldnt be an issue for anyone"""
         if self.save:
             self.printout('error', 'Cannot Save with Clutter flag set')
             self.printout('error', 'Retaining files as safety measure')
@@ -288,9 +333,9 @@ class DataHub:
             
             if self.dir_treeforge.exists():
                 for item in self.dir_treeforge.iterdir():
-                    if item.is_dir() and item.name != 'logs':
+                    if item.is_dir() and item.name not in ['logs', 'gene_trees']:
                         shutil.rmtree(item)
-                    elif item.is_file() and item.name != 'FinalTree.tree':
+                    elif item.is_file() and item.name != 'FinalTree.tre':
                         item.unlink()
                 
                 self.printout('metric', f'Intermediate files removed')
@@ -298,6 +343,8 @@ class DataHub:
                 self.printout('error', 'TreeForge directory not found')
 
     def _move_fai(self):
+        """Move the fai files to the TreeForge/base/fai directory.
+        Makes things look cleaner."""
         files_fai = glob(os.path.join(self.dir_base, '*.fai'))
         dir_fai = os.path.join(self.dir_treeforge, 'fai')
         os.makedirs(dir_fai, exist_ok=True)
@@ -308,6 +355,9 @@ class DataHub:
             os.remove(os.path.join(self.dir_base, 'phyx.logfile'))
 
     def _save_csv(self):
+        """Save the metrics to a csv file.
+        Really needs some work. A lot of metrics here that arent useful, and probably 
+        a lot of good metrics I'm not keeping track of."""
         def iter_dct(dct):
             result = {}
             for k,v in dct.items():
@@ -362,6 +412,9 @@ class DataHub:
         return flattened_dct
 
     def _contig_renamer(self):
+        """Rename the contigs/transcripts/scaffolds.
+        This should take care of any naming schemes or weird characters.
+        Prevents treeforge and the stuff it wraps from crashing"""
         # self.printout('subtitle', 'Create Temp Fasta')
         contig_renamer = Contig(self.dir_base, self.master_dict['base']['temp_fasta'])
         self.renamed_map = contig_renamer.name_mapping
@@ -381,13 +434,12 @@ class DataHub:
         self._execute('Astral', self.astral, 'astral_skip')
         self.printout('title', 'TreeForge Complete')
         self._move_fai()
-        self._clutter_check() if self.clutter else None
+        self._clutter_check()
         self._save_csv()
 
     @bilge_crew()
     def blast(self):
         self.printout('subtitle', 'BLAST')
-        # Get the actual renamed files that were created by the contig renaming process
         renamed_files = [Path(f) for f in glob(os.path.join(self.dir_treeforge, 'temp_fasta', '*')) if f.endswith(tuple(['.fasta', '.fa', '.fas', '.fna']))]
         blast = Blast(self.dir_base,                                         # Input Base Directory
                       self.dir_treeforge,                                    # TreeForge Directory
@@ -397,7 +449,9 @@ class DataHub:
                       self.threads,                                          # Number of threads
                       self.log,                                              # Log level
                       self.hc,                                               # Highlight color
-                      self.bc)                                               # Background color
+                      self.bc,                                               # Background color
+                      self.blast_evalue,                                     # BLAST E-value threshold
+                      self.blast_max_targets)                                # BLAST max target sequences
         blast.run()
         return blast.return_dict
     
@@ -415,7 +469,11 @@ class DataHub:
                   self.threads,                                                     # Number of threads
                   self.log,                                                         # Log level
                   self.hc,                                                          # Highlight color
-                  self.bc)                                                          # Background color
+                  self.bc,                                                          # Background color
+                  self.mcl_inflation,                                               # MCL inflation parameter
+                  self.perfect_identity,                                            # Perfect identity threshold
+                  self.coverage_threshold,                                          # Coverage threshold for identical sequences
+                  self.min_seq_length)                                              # Minimum sequence length
         mcl.run()
         return mcl.return_dict
 
@@ -427,7 +485,10 @@ class DataHub:
                       self.threads,                                                  # Number of threads
                       self.log,                                                      # Log level
                       self.hc,                                                       # Highlight color
-                      self.bc)                                                       # Background color
+                      self.bc,                                                       # Background color
+                      self.mafft_maxiter,                                            # MAFFT max iterations
+                      self.pxclsq_threshold,                                         # pxclsq probability threshold
+                      self.thread_divisor)                                           # Thread division factor
         mafft.run()
         return mafft.return_dict
 
@@ -448,7 +509,14 @@ class DataHub:
                     self.log,                                                          # Log level
                     self.hc,                                                           # Highlight color
                     self.bc,                                                           # Background color
-                    )                                                  # Renamed Map
+                    self.relative_cutoff,                                              # Relative cutoff for trimming tips
+                    self.absolute_cutoff,                                              # Absolute cutoff for trimming tips
+                    self.branch_cutoff,                                                # Branch cutoff for cutting branches
+                    self.mask_paralogs,                                                # Mask paraphyletic tips
+                    self.outlier_ratio,                                                # Ratio threshold for outlier detection
+                    self.max_trim_iterations,                                          # Maximum trimming iterations
+                    self.min_subtree_taxa,                                             # Minimum taxa for valid subtrees
+                    self.min_tree_leaves)                                              # Minimum leaves for valid tree
         tree.run()
         return tree.return_dict
 
@@ -463,7 +531,9 @@ class DataHub:
                       self.threads,                                                      # Number of threads
                       self.log,                                                          # Log level
                       self.hc,                                                           # Highlight color
-                      self.bc)                                                           # Background color
+                      self.bc,                                                           # Background color
+                      self.prune_relative_cutoff,                                        # Relative tip cutoff for pruning
+                      self.prune_absolute_cutoff)                                        # Absolute tip cutoff for pruning
         prune.run()
         return prune.return_dict
 
@@ -478,7 +548,9 @@ class DataHub:
                       self.threads,                                                      # Number of threads
                       self.log,                                                          # Log level
                       self.hc,                                                           # Highlight color
-                      self.bc)                                                           # Background color
+                      self.bc,                                                           # Background color
+                      self.prank_pxclsq_threshold,                                       # pxclsq probability threshold (PRANK)
+                      self.bootstrap_replicates)                                         # IQ-TREE bootstrap replicates
         prank.run()
         return prank.return_dict
 
@@ -493,7 +565,8 @@ class DataHub:
                             self.threads,                                                 # Number of threads
                             self.log,                                                     # Log level
                             self.hc,                                                      # Highlight color
-                            self.bc)                                                      # Background color
+                            self.bc,                                                      # Background color
+                            self.super_bootstrap)                                         # Supermatrix bootstrap replicates
         super.run()
         return super.return_dict
 

@@ -15,7 +15,9 @@ class TrimTips:
                  absolute_cutoff,   # Absolute cutoff for trimming tips
                  contig_dct,        # Dictionary of contigs
                  hcolor,            # Color for logging
-                 ):
+                 outlier_ratio,     # Ratio threshold for outlier detection
+                 max_trim_iterations, # Maximum trimming iterations
+                 min_tree_leaves):   # Minimum leaves for valid tree
         
         self.dir_tree        = Path(dir_tree)
         self.dir_mafft       = Path(dir_mafft)
@@ -25,13 +27,16 @@ class TrimTips:
         self.absolute_cutoff = absolute_cutoff
         self.contig_dct      = contig_dct
         self.hcolor          = hcolor
+        self.outlier_ratio   = outlier_ratio
+        self.max_trim_iterations = max_trim_iterations
+        self.min_tree_leaves = min_tree_leaves
 
     def check_contrast_outlier(self, node0, node1, above0, above1, relative_cutoff):
         if node0.is_leaf() and above0 > relative_cutoff:
-            if above1 == 0.0 or above0/above1 > 20:  # Increased ratio threshold
+            if above1 == 0.0 or above0/above1 > self.outlier_ratio:  # Use parameter instead of hardcoded 20
                 return node0
         if node1.is_leaf() and above1 > relative_cutoff:
-            if above0 == 0.0 or above1/above0 > 20:  # Increased ratio threshold
+            if above0 == 0.0 or above1/above0 > self.outlier_ratio:  # Use parameter instead of hardcoded 20
                 return node1
         return None
 
@@ -94,7 +99,7 @@ class TrimTips:
 
         going = True
         iteration = 0
-        max_iterations = 10  # Limit the number of iterations
+        max_iterations = self.max_trim_iterations  # Use parameter instead of hardcoded 10
         while going and tree is not None and len(tree.get_leaves()) > 3 and iteration < max_iterations:
             iteration += 1
             going = False
@@ -202,9 +207,9 @@ class TrimTips:
                     continue
 
                 file_metrics['leaves_after'] = len(outtree.get_leaves())
-                if len(outtree.get_leaves()) < 4:
+                if len(outtree.get_leaves()) < self.min_tree_leaves:
                     metrics['skipped_count'] += 1
-                    file_metrics['error'] = f'insufficient leaves after trimming ({len(outtree.get_leaves())} < 4)'
+                    file_metrics['error'] = f'insufficient leaves after trimming ({len(outtree.get_leaves())} < {self.min_tree_leaves})'
                     file_metrics['status'] = 'skipped'
                     metrics['file_details'].append(file_metrics)
                     continue

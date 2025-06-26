@@ -15,7 +15,9 @@ class Prune:
                  threads,
                  log,
                  hc,
-                 bc):
+                 bc,
+                 prune_relative_cutoff,
+                 prune_absolute_cutoff):
         
         self.dir_base    = dir_base
         self.dir_prune   = dir_prune
@@ -28,8 +30,8 @@ class Prune:
         self.bc          = bc
 
         self.subtree_files       = [Path(os.path.join(dir_trimmed, f)) for f in os.listdir(dir_trimmed) if f.endswith('.subtree')]
-        self.relative_tip_cutoff = 0.2
-        self.absolute_tip_cutoff = 0.3
+        self.relative_tip_cutoff = prune_relative_cutoff
+        self.absolute_tip_cutoff = prune_absolute_cutoff
         self.minimum_taxa        = orthocutoff
         self.threads             = threads
         self.outpath             = Path(os.path.join(self.dir_prune, '1to1ortho'))

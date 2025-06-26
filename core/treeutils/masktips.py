@@ -20,7 +20,8 @@ class MaskTips:
                  dir_cln,
                  para,
                  tree_ending,
-                 hcolor
+                 hcolor,
+                 min_tree_leaves
                  ):
         
         self.dir_tree    = Path(dir_tree)
@@ -30,6 +31,7 @@ class MaskTips:
         self.tree_ending = tree_ending
         self.tree_files  = list(Path(os.path.join(self.dir_cln, f)) for f in os.listdir(self.dir_cln) if f.endswith(self.tree_ending))
         self.hcolor      = hcolor
+        self.min_tree_leaves = min_tree_leaves
         self.return_dict = {'tree': {}}
         
         self.metrics = {
@@ -203,7 +205,7 @@ class MaskTips:
         try:
             leaves = node.leaves()
             num_leaves = len(leaves)
-            return num_leaves >= 4
+            return num_leaves >= self.min_tree_leaves
         except Exception as e:
             return False
     
