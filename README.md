@@ -142,7 +142,7 @@ TreeForge/
 └── FinalTree.tree  # Final phylogenetic tree
 ```
 
-<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Output Files</h2>
+<h2><img src="https://i.imgur.com/Me9E0cM.png" width="20" align="top">&ensp;Output Files</h2>
 
 - **`FinalTree.tre`**  - The final phylogenetic tree in Newick format
 - **`cluster_x.tree`** - Collection of gene trees in the Newick format
