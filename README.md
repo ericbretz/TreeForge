@@ -89,7 +89,6 @@ python treeforge.py -d /path/to/fasta/files
 | `--super-bootstrap` | `-sb` | Supermatrix bootstrap replicates | 1000 |
 | **Utility** | | | |
 | `--version` | `-v` | Print version | - |
-| `--log` | `-l` | Log level (0-4) | 3 |
 
 <h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Examples</h2>
 
