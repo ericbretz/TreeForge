@@ -97,7 +97,7 @@ python treeforge.py -d /path/to/fasta/files
 python treeforge.py -d /path/to/sequences
 ```
 
-#### Typical parameters for DNA sequences:
+#### Recommended parameters to use (custom values):
 ```bash
 python treeforge.py -d /path/to/sequences -i 5 -t 8 -hf 0.4 -mt 15 -po 25 -ps dna
 ```
