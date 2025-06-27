@@ -149,5 +149,5 @@ TreeForge/
 - **`treeforge.csv`**  - Summary metrics for each pipeline step
 
 <p align="center">
-  <img src="https://i.imgur.com/Me9E0cM.png" alt="Treeforge Workflow" width="1000">
+  <img src="https://i.imgur.com/v4OAUEE.png" alt="Treeforge Workflow" width="1000">
 </p>
