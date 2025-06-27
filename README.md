@@ -85,8 +85,6 @@ python treeforge.py -d /path/to/fasta/files
 | `--prank-seqtype` | `-ps` | Sequence type for PRANK (dna/aa) | aa |
 | `--prank-pxclsq-threshold` | `-pp` | pxclsq probability threshold (PRANK) | 0.3 |
 | `--prank-bootstrap` | `-pb` | IQ-TREE bootstrap replicates | 1000 |
-| **Super Stage** | | | |
-| `--super-bootstrap` | `-sb` | Supermatrix bootstrap replicates | 1000 |
 | **Utility** | | | |
 | `--version` | `-v` | Print version | - |
 
