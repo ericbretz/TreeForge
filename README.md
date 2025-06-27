@@ -124,8 +124,8 @@ TreeForge creates a `TreeForge/` directory in your input directory with the foll
 
 ```
 TreeForge/
-├── base/           # Base files and indices
 ├── blast/          # BLAST results
+├── fai/            # Stores fai files
 ├── mcl/            # MCL clustering results
 ├── iter_0/         # First iteration results
 │   ├── mafft/      # MAFFT alignments
