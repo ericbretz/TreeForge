@@ -11,6 +11,7 @@
 import os
 import sys
 import argparse
+from glob import glob
 from core.utils.logo import print_logo, print_help, print_args
 from core.datahub import DataHub
 from core.utils.deps import Deps
@@ -31,7 +32,7 @@ s: Skip Astral
 
 MAJOR = 0
 MINOR = 2
-PATCH = 0
+PATCH = 1
 
 VERSION = f"{MAJOR}.{MINOR}.{PATCH}"
 
@@ -174,6 +175,21 @@ class TreeForge:
         
         return parser.parse_args()
     
+    def _file_exists(self, dir):
+        #['.fasta', '.fa', '.fas', '.fna']
+        if os.path.exists(dir):
+            files = glob(os.path.join(dir, '*.fa'))
+            files.extend(glob(os.path.join(dir, '*.fasta')))
+            files.extend(glob(os.path.join(dir, '*.fna')))
+            files.extend(glob(os.path.join(dir, '*.fas')))
+            if not files:
+                self.printout('error', 'No FASTA files found in directory')
+                sys.exit(1)
+            return files
+        else:
+            self.printout('error', 'Directory does not exist')
+            sys.exit(1)
+
     def run(self):
         args                  = self.parser()
         passed_args           = {k: v for k, v in args.__dict__.items() if v != self.defaults_dict[k] and v != '-'}
@@ -188,6 +204,7 @@ class TreeForge:
         print_args(args, args.highlight_color, passed_args)
         deps = Deps(args.log, args.highlight_color, args.background_color)
         deps.check_deps()
+        self._file_exists(args.dir)
         dataHub = DataHub(args)
         dataHub.run()
 

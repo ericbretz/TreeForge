@@ -113,12 +113,12 @@ class DataHub:
 
     def _dict_setup(self):
         """Setup master dictionary with directory structure."""
+        """Tried to find a middle ground between organization and ll ./x/y/z/ hell"""
         
         self.dir_logs = Path(os.path.join(self.dir_treeforge, 'logs'))
 
         self.master_dict = {
-            'base'      : {'dir': Path(os.path.join(self.dir_treeforge, 'base')), 
-                           'fai': Path(os.path.join(self.dir_treeforge, 'fai')),
+            'base'      : {'fai': Path(os.path.join(self.dir_treeforge, 'fai')),
                            'temp_fasta': Path(os.path.join(self.dir_treeforge, 'temp_fasta'))
                            },
             'blast'     : {
@@ -324,7 +324,7 @@ class DataHub:
         """Check that the clutter flag is not set when the save flag is set.
         If clutter is set and save is not set, remove all intermediate files.
         save flag is a dev flag so shouldnt be an issue for anyone"""
-        if self.save:
+        if self.save and self.clutter:
             self.printout('error', 'Cannot Save with Clutter flag set')
             self.printout('error', 'Retaining files as safety measure')
             return
@@ -343,7 +343,7 @@ class DataHub:
                 self.printout('error', 'TreeForge directory not found')
 
     def _move_fai(self):
-        """Move the fai files to the TreeForge/base/fai directory.
+        """Move the fai files to the TreeForge/fai directory.
         Makes things look cleaner."""
         files_fai = glob(os.path.join(self.dir_base, '*.fai'))
         dir_fai = os.path.join(self.dir_treeforge, 'fai')
@@ -378,7 +378,7 @@ class DataHub:
             flattened = iter_dct(v)
             flattened_dct[k] = flattened
         
-        csv_file = Path(os.path.join(self.dir_treeforge, f'treeforge.csv'))
+        csv_file = Path(os.path.join(self.dir_treeforge, f'summary.csv'))
         
         with open(csv_file, 'w', newline='') as f:
             writer = csv.writer(f)
@@ -436,6 +436,11 @@ class DataHub:
         self._move_fai()
         self._clutter_check()
         self._save_csv()
+        self.printout('final', {'Final Tree': os.path.join(self.dir_treeforge, 'FinalTree.tre'),
+                                'Metrics CSV': os.path.join(self.dir_treeforge, 'summary.csv'),
+                                'Gene Trees': os.path.join(self.dir_treeforge, 'gene_trees'),
+                                'Gene Tree Count': len(glob(os.path.join(self.dir_treeforge, 'gene_trees', '*.tre'))),
+                                })
 
     @bilge_crew()
     def blast(self):

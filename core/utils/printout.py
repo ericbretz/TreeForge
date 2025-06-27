@@ -202,6 +202,8 @@ class PrintOut:
             self.p_success(content)
         elif style == 'progress':
             self.p_progress(content)
+        elif style == 'final':
+            self.p_final(content)
         else:
             raise ValueError(f"Invalid style: {style}")
         return content
@@ -276,6 +278,25 @@ class PrintOut:
         color = self.styles['progress']['color']
         width = self.styles['progress']['width']
         print(f"\033[47m{progress:^{width}}\033[0m", end='\r', flush=True)
+
+    def p_final(self, files: dict) -> None:
+        def draw_box(lines, hcolor):
+            width = 78
+            top = f'{hcolor}╭{"─" * width}╮\033[0m'
+            bottom = f'{hcolor}╰{"─" * width}╯\033[0m'
+            print(top)
+            for line in lines:
+                print(f'{hcolor}│ \033[0m{line:<{width-1}}{hcolor}│\033[0m')
+            print(bottom)
+        out_list = []
+        for dir, file in files:
+            if dir != 'Gene Tree Count':
+                s = f'{dir:<18}│ {self.fmt_str(str(file), value=True)}'
+                out_list.append(s)
+            else:
+                s = f'{dir:<18}│ {file}'
+                out_list.append(s)
+        draw_box(out_list, self.hc)
 
     def printout(self, style: str, content: Any) -> None:
         content = self.check_type(content)

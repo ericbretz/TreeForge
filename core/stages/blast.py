@@ -51,6 +51,7 @@ class Blast:
         blast = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         if blast.returncode != 0:
             self.printout('error', 'BLAST makeblastdb failed')
+            self.printout('error', blast.stderr.decode('utf-8'))
             sys.exit(1)
         else:
             return
