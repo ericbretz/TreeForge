@@ -138,7 +138,7 @@ TreeForge/
 ├── super/          # Supertree results
 ├── gene_trees/     # Gene tree files
 ├── logs/           # Log files
-├── treeforge.csv   # Metrics summary
+├── summary.csv   # Metrics summary
 └── FinalTree.tree  # Final phylogenetic tree
 ```
 
@@ -146,7 +146,7 @@ TreeForge/
 
 - **`FinalTree.tre`**  - The final phylogenetic tree in Newick format
 - **`cluster_x.tree`** - Collection of gene trees in the Newick format
-- **`treeforge.csv`**  - Summary metrics for each pipeline step
+- **`summary.csv`**  - Summary metrics for each pipeline step
 
 <p align="center">
   <img src="https://i.imgur.com/v4OAUEE.png" alt="Treeforge Workflow" width="1000">
