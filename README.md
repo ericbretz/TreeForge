@@ -138,7 +138,7 @@ TreeForge/
 ├── super/          # Supertree results
 ├── gene_trees/     # Gene tree files
 ├── logs/           # Log files
-├── summary.csv   # Metrics summary
+├── summary.csv     # Metrics summary
 └── FinalTree.tree  # Final phylogenetic tree
 ```
 
