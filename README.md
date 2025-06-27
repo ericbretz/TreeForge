@@ -3,7 +3,7 @@
 </p>
 
 **Treeforge** is a pipeline for building phylogenetic trees from genomic data. This tool automates the phylogenomic workflow developed by Yang Y. and S.A. Smith. Treeforge combines several bioinformatics tools to do sequence alignment, clustering, tree building, and refinement. The whole process is automated and runs in steps, so, all you need to enter is a directory of .fasta files containing your genomic or transcriptomic sequences.
-To learn more about the original workflow behind this pipeline, see: https://bitbucket.org/yanglab/phylogenomic_dataset_construction/src/master/
+To learn more about the original workflow behind this pipeline, see: https://bitbucket.org/yanglab/phylogenomic_dataset_construction/
 <p align="right">EC Bretz</p>
 
 > [!CAUTION]
