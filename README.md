@@ -58,8 +58,8 @@ python treeforge.py -d /path/to/fasta/files
 
 ### Command Line Options
 
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
+| Option |   Short   | Description | Default |
+|--------|-----------|-------------|---------|
 | **Basic Parameters** | | | |
 | `--input-dir` | `-d` | Directory containing FASTA files | Current directory |
 | `--output-dir` | `-o` | Output directory | Same as input |
@@ -124,7 +124,7 @@ python treeforge.py -d /path/to/sequences -o /path/to/output --output-super-matr
 
 #### Typical parameters for DNA sequences:
 ```bash
-python treeforge.py -d /path/to/sequences -i 5 -t 8 -hf 0.4 -mt 15 -po 25 -ps dna
+python treeforge.py -d /path/to/sequences -i 5 -t 8 -hf 0.4 -mt 8 -po 9
 ```
 
 #### Clean Clutter (remove intermediate files):
@@ -137,7 +137,7 @@ python treeforge.py -d /path/to/sequences -c
 # Create a default configuration file
 python treeforge.py --config-create
 
-# Run with a configuration file
+# Load configuration file
 python treeforge.py --config config.yaml
 
 # Save current arguments to config
