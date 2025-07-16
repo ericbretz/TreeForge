@@ -162,27 +162,27 @@ TreeForge creates a `TreeForge/` directory in your output directory (or input di
 
 ```
 TreeForge/
-├── base/           # Base files and indices
-├── blast/          # BLAST results
+├── base/                   # Base files and indices
+├── blast/                  # BLAST results
 │   ├── concatenated.fasta
 │   └── raw.blast
-├── mcl/            # MCL clustering results
-├── iter_0/         # First iteration results
-│   ├── mafft/      # MAFFT alignments
-│   └── tree/       # Tree files
-├── iter_1/         # Second iteration results
+├── mcl/                    # MCL clustering results
+├── iter_0/                 # First iteration results
+│   ├── mafft/              # MAFFT alignments
+│   └── tree/               # Tree files
+├── iter_1/                 # Second iteration results
 │   ├── mafft/
 │   └── tree/
-├── prune/          # Pruned orthologs
-│   └── 1to1ortho/  # 1-to-1 ortholog trees
-├── prank/          # PRANK alignments
-├── super/          # Supertree and supermatrix results
+├── prune/                  # Pruned orthologs
+│   └── 1to1ortho/          # 1-to-1 ortholog trees
+├── prank/                  # PRANK alignments
+├── super/                  # Supertree and supermatrix results
 │   └── concat.tre
-├── gene_trees/     # Gene tree files
-├── logs/           # Log files
-├── summary.csv     # Metrics summary
-└── SpeciesTree.tre # Final phylogenetic tree
-└── SuperMatrix.tre # (if --output-super-matrix)
+├── gene_trees/             # Gene tree files
+├── logs/                   # Log files
+├── summary.csv             # Metrics summary
+└── SpeciesTree.tre         # Final phylogenetic tree
+└── SuperMatrix.tre         # (if --output-super-matrix)
 ```
 
 <h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Output Files</h2>
