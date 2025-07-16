@@ -41,6 +41,11 @@ class PrintOut:
                 'width'   : 80,
                 'char'    : ' '
             },
+            'debug': {
+                'color'   : '\033[44m',
+                'width'   : 80,
+                'char'    : ' '
+            },
             'success': {    
                 'color'   : '\033[42m',
                 'width'   : 80,
@@ -198,6 +203,8 @@ class PrintOut:
             self.p_info(content)
         elif style == 'error':
             self.p_error(content)
+        elif style == 'debug':
+            self.p_debug(content)
         elif style == 'success':
             self.p_success(content)
         elif style == 'progress':
@@ -264,6 +271,14 @@ class PrintOut:
         char     = self.styles['error']['char']
         title    = f'{"ERROR":<20}'
         string = f'{error:<{width - 20}}'
+        print(f"{color}{title}\033[0m {string}")
+
+    def p_debug(self, debug: str) -> None:
+        color    = self.styles['debug']['color']
+        width    = self.styles['debug']['width']
+        char     = self.styles['debug']['char']
+        title    = f'{"DEBUG":<20}'
+        string = f'{debug:<{width - 20}}'
         print(f"{color}{title}\033[0m {string}")
 
     def p_success(self, success: str) -> None:

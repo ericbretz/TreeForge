@@ -1,6 +1,6 @@
 import sys
-import subprocess
 import pysam
+import subprocess
 from core.utils.printout import PrintOut
 
 class Blast:
@@ -14,9 +14,9 @@ class Blast:
         self.blast_evalue       = blast_evalue
         self.blast_max_targets  = blast_max_targets
         self.contig_count       = 0
-        self.return_dict = {'contig_count': self.contig_count}
-        self.printClass = PrintOut(log, hc, bc)
-        self.printout = self.printClass.printout
+        self.return_dict        = {'contig_count': self.contig_count}
+        self.printClass         = PrintOut(log, hc, bc)
+        self.printout           = self.printClass.printout
 
     def run(self):
         self.fasta_concatenation()
@@ -33,7 +33,7 @@ class Blast:
         for fasta in self.files_fasta:
             fasta = pysam.FastaFile(fasta)
             reference = fasta.references
-            for i, name in enumerate(reference):
+            for _, name in enumerate(reference):
                 seq = fasta.fetch(name)
                 lines.append(f">{name}\n{seq}")
                 self.contig_count += 1
@@ -48,7 +48,7 @@ class Blast:
         '''
         self.printout('metric', 'Build Database')
         cmd   = f'makeblastdb -in {self.files_concatenated} -parse_seqids -dbtype nucl -out {self.files_concatenated}'
-        blast = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        blast = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
         if blast.returncode != 0:
             self.printout('error', 'BLAST makeblastdb failed')
             self.printout('error', blast.stderr.decode('utf-8'))

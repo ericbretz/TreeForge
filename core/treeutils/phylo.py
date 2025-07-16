@@ -1,6 +1,6 @@
 
 from functools import lru_cache
-from ete3 import TreeNode
+from ete3      import TreeNode
 
 PREORDER     = 0
 POSTORDER    = 1
@@ -9,22 +9,21 @@ INTERNODES   = 1
 
 class Node:
     def __init__(self, ete_node=None):
-        self._ete_node = ete_node if ete_node is not None else TreeNode()
-        self.data = {}
-        self.isroot = False
-        self.istip = self._ete_node.is_leaf()
-        self._label = self._ete_node.name
-        self._length = self._ete_node.dist
-        self._parent = None
-        self._children = []
-        self.nchildren = 0
-        self.excluded_dists = []
+        self._ete_node       = ete_node if ete_node is not None else TreeNode()
+        self.data            = {}
+        self.isroot          = False
+        self.istip           = self._ete_node.is_leaf()
+        self._label          = self._ete_node.name
+        self._length         = self._ete_node.dist
+        self._parent         = None
+        self._children       = []
+        self.nchildren       = 0
+        self.excluded_dists  = []
         self._leaf_distances = None
-        self._path_to_root = None
-        self._size = None
-        self._features = {}
+        self._path_to_root   = None
+        self._size           = None
+        self._features       = {}
         
-        # Initialize children
         if not self.istip:
             self._children = [Node(child) for child in self._ete_node.children]
             self.nchildren = len(self._children)
@@ -37,7 +36,7 @@ class Node:
 
     @label.setter
     def label(self, value):
-        self._label = value
+        self._label         = value
         self._ete_node.name = value
 
     @property
@@ -46,7 +45,7 @@ class Node:
 
     @name.setter
     def name(self, value):
-        self._label = value
+        self._label         = value
         self._ete_node.name = value
 
     @property
@@ -55,7 +54,7 @@ class Node:
 
     @dist.setter
     def dist(self, value):
-        self._length = value
+        self._length        = value
         self._ete_node.dist = value
 
     @property
@@ -64,7 +63,7 @@ class Node:
 
     @length.setter
     def length(self, value):
-        self._length = value
+        self._length        = value
         self._ete_node.dist = value
 
     @property
@@ -85,9 +84,9 @@ class Node:
 
     @children.setter
     def children(self, value):
-        self._children = value
+        self._children          = value
         self._ete_node.children = [child._ete_node for child in value]
-        self.nchildren = len(value)
+        self.nchildren          = len(value)
 
     def is_leaf(self):
         return self._ete_node.is_leaf()
@@ -126,21 +125,21 @@ class Node:
         assert child not in self._children
         self._ete_node.add_child(child._ete_node)
         self._children.append(child)
-        child._parent = self
-        self.nchildren = len(self._children)
+        child._parent        = self
+        self.nchildren       = len(self._children)
         self._leaf_distances = None
-        self._path_to_root = None
-        self._size = None
+        self._path_to_root   = None
+        self._size           = None
 
     def remove_child(self, child):
         assert child in self._children
         self._ete_node.remove_child(child._ete_node)
         self._children.remove(child)
-        child._parent = None
-        self.nchildren = len(self._children)
+        child._parent        = None
+        self.nchildren       = len(self._children)
         self._leaf_distances = None
-        self._path_to_root = None
-        self._size = None
+        self._path_to_root   = None
+        self._size           = None
         
     def leaves(self):
         """Return a list of all leaf nodes in the tree."""
@@ -241,12 +240,12 @@ class Node:
             path = list(tip.rootpath())
             for node in path:
                 if node not in d:
-                    newnode = Node()
-                    newnode.istip = node.istip
-                    newnode.length = node.length
-                    newnode.label = node.label
-                    d[node] = newnode
-                    d[newnode] = node
+                    newnode          = Node()
+                    newnode.istip    = node.istip
+                    newnode.length   = node.length
+                    newnode.label    = node.label
+                    d[node]          = newnode
+                    d[newnode]       = node
                 else:
                     newnode = d[node]
 
@@ -264,11 +263,11 @@ class Node:
                     oldnode = d[n]
                     del d[oldnode]
                     del d[n]
-                    child = n._children[0]
-                    child._parent = None
-                    child.isroot = True
-                    d["newroot"] = child
-                    d["oldroot"] = d[child]
+                    child           = n._children[0]
+                    child._parent   = None
+                    child.isroot    = True
+                    d["newroot"]    = child
+                    d["oldroot"]    = d[child]
                     n = child
                 else:
                     break
@@ -327,7 +326,7 @@ def reroot(oldroot, newroot):
         cp.remove_child(node)
         node.add_child(cp)
         cp.length = node.length
-        cp.label = node.label
+        cp.label  = node.label
     return newroot
 
 def getMRCA(innames, tree):
@@ -340,19 +339,19 @@ def getMRCA(innames, tree):
             for i in range(len(tree.leaves())):
                 if tree.leaves()[i].label == name:
                     outgroup.append(tree.leaves()[i])
-        cur2 = None
+        cur2     = None
         tempmrca = None
-        cur1 = outgroup.pop()
+        cur1     = outgroup.pop()
         while len(outgroup)>0:
-            cur2 = outgroup.pop()
+            cur2     = outgroup.pop()
             tempmrca = getMRCATraverse(cur1,cur2)
-            cur1 = tempmrca
+            cur1     = tempmrca
         mrca = cur1
     return mrca
 
 def getMRCATraverse(curn1, curn2):
-    mrca = None
-    path1 = []
+    mrca   = None
+    path1  = []
     parent = curn1
     path1.append(parent)
     while parent != None:
@@ -373,9 +372,9 @@ def getMRCATraverse(curn1, curn2):
     return mrca
     
 def getMRCATraverseFromPath(path1, curn2):
-    mrca = None
+    mrca   = None
     parent = curn2
-    x = True;
+    x      = True;
     while x == True:
         for i in range(len(path1)):
             if parent == path1[i]:

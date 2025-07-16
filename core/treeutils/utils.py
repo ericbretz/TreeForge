@@ -1,18 +1,15 @@
 from __future__ import annotations
-import os
-from pathlib import Path
-from typing import List, Set, Dict, Optional, Iterator
-from dataclasses import dataclass
-from functools import lru_cache
-from Bio.SeqIO import parse as seq_parse
-from core.treeutils.newick import parse
-from core.treeutils.phylo import reroot, Node
+from pathlib 				import Path
+from typing 				import List, Set, Dict
+from dataclasses 			import dataclass
+from functools 				import lru_cache
+from core.treeutils.phylo 	import reroot, Node
 
 @dataclass
 class TreeData:
-	tree: Node
-	cluster_id: str
-	seq_dict: Dict[str, str]
+	tree       : Node
+	cluster_id : str
+	seq_dict   : Dict[str, str]
 
 @lru_cache(maxsize=128)
 def get_name(label: str) -> str:
@@ -48,14 +45,13 @@ def remove_kink(node, curroot):
 	if not node.children:
 		return None, curroot
 		
-	# Can't remove kink if node has no parent
 	if node.parent is None:
 		return None, curroot
 		
 	length = node.dist + (node.children[0]).dist
-	par = node.parent
-	kink = node
-	node = node.children[0]
+	par    = node.parent
+	kink   = node
+	node   = node.children[0]
 	par.remove_child(kink)
 	par.add_child(node)
 	node.dist = length
@@ -110,8 +106,8 @@ def get_ortho_from_rooted_inclade(inclade: Node) -> List[Node]:
 	return orthologs
 
 def extract_rooted_ingroup_clades(root: Node, ingroups: List[str], outgroups: List[str], min_ingroup_taxa: int) -> List[Node]:
-	inclades = []
-	ingroups_set = set(ingroups)
+	inclades      = []
+	ingroups_set  = set(ingroups)
 	outgroups_set = set(outgroups)
 	
 	while True:
@@ -119,8 +115,8 @@ def extract_rooted_ingroup_clades(root: Node, ingroups: List[str], outgroups: Li
 		
 		node_data = {}
 		for node in root.iternodes():
-			front_names = set(get_front_names(node))
-			back_names = set(get_back_names(node, root))
+			front_names 	= set(get_front_names(node))
+			back_names 		= set(get_back_names(node, root))
 			node_data[node] = (front_names, back_names)
 		
 		for node in root.iternodes():
@@ -161,30 +157,3 @@ def extract_rooted_ingroup_clades(root: Node, ingroups: List[str], outgroups: Li
 		else: 
 			break
 	return inclades
-
-def write_tree(all_fasta: str, trim_dir: str, iter_dir: str, tree_file_ending: str) -> None:
-	fasta = all_fasta
-	treDIR = Path(trim_dir)
-	outIncr = int(iter_dir.split('_')[-1]) + 1
-	outDIR = Path(iter_dir.split('_')[:-1]) / str(outIncr)
-	tree_file_ending = '.subtree'
-
-	print("Reading fasta file",fasta)
-	seqDICT = {}
-	for s in seq_parse(fasta, 'fasta'):
-		seqDICT[s.id] = str(s.seq)
-	print("Writing fasta files")
-	filecount = 0
-	for tree_file in treDIR.glob(f'*{tree_file_ending}'):
-		print(tree_file.name)
-		filecount += 1
-		with open(tree_file, "r") as infile:
-			intree = parse(infile.readline())
-		clusterID = get_clusterID(tree_file.name)
-		if clusterID.endswith("rr"):
-			outname = outDIR / f"{clusterID}_rr.fa"
-		else: outname = outDIR / f"{clusterID}rr.fa"
-		with open(outname,"w") as outfile:
-			for label in get_front_labels(intree):
-				outfile.write(f">{label}\n{seqDICT[label]}\n")
-	assert filecount > 0, f"No file ends with {tree_file_ending} found in {treDIR}"
