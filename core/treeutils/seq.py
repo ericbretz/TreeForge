@@ -1,14 +1,14 @@
-from typing import List, Iterator
+from typing 	 import List, Iterator
 from dataclasses import dataclass
-from Bio.Seq import Seq
+from Bio.Seq 	 import Seq
 
 offset = 33
 
 @dataclass
 class Sequence:
-	name: str = ""
-	seq: str = ""
-	qualstr: str = ""
+	name   : str       = ""
+	seq    : str       = ""
+	qualstr: str       = ""
 	qualarr: List[int] = None
 
 	def __post_init__(self):
@@ -44,7 +44,7 @@ def _fastq_generator_internal(infile) -> Iterator[Sequence]:
 	while line:
 		if line.startswith('@'):
 			name = line[1:].strip()
-			seq = infile.readline().strip()
+			seq  = infile.readline().strip()
 			infile.readline().strip()
 			qual = infile.readline().strip()
 			tseq = Sequence(name=name, seq=seq)
@@ -56,7 +56,7 @@ def read_fasta_file(filename: str) -> List[Sequence]:
 	seqlist = []
 	templab = ""
 	tempseq = ""
-	first = True
+	first   = True
 	
 	with open(filename, "r") as fl:
 		for line in fl:
@@ -65,7 +65,7 @@ def read_fasta_file(filename: str) -> List[Sequence]:
 					seqlist.append(Sequence(templab, tempseq))
 				templab = line.strip()[1:]
 				tempseq = ""
-				first = False
+				first   = False
 			else:
 				tempseq += line.strip()
 	

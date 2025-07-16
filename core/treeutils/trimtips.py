@@ -1,35 +1,35 @@
 import os
-from pathlib import Path
+from pathlib               import Path
 from core.treeutils.newick import parse, tostring
-from itertools import combinations
-from core.treeutils.utils import remove_kink
-from core.treeutils.phylo import Node
-from ete3 import Tree
+from itertools             import combinations
+from core.treeutils.utils  import remove_kink
+from core.treeutils.phylo  import Node
+from ete3                  import Tree
 
 class TrimTips:
     def __init__(self,
-                 dir_tree,          # Directory of the tree files
-                 dir_mafft,         # Directory of the mafft files
-                 tree_ending,       # Ending of the tree files
-                 relative_cutoff,   # Relative cutoff for trimming tips
-                 absolute_cutoff,   # Absolute cutoff for trimming tips
-                 contig_dct,        # Dictionary of contigs
-                 hcolor,            # Color for logging
-                 outlier_ratio,     # Ratio threshold for outlier detection
-                 max_trim_iterations, # Maximum trimming iterations
-                 min_tree_leaves):   # Minimum leaves for valid tree
+                 dir_tree,              # Directory of the tree files
+                 dir_mafft,             # Directory of the mafft files
+                 tree_ending,           # Ending of the tree files
+                 relative_cutoff,       # Relative cutoff for trimming tips
+                 absolute_cutoff,       # Absolute cutoff for trimming tips
+                 contig_dct,            # Dictionary of contigs
+                 hcolor,                # Color for logging
+                 outlier_ratio,         # Ratio threshold for outlier detection
+                 max_trim_iterations,   # Maximum trimming iterations
+                 min_tree_leaves):      # Minimum leaves for valid tree
         
-        self.dir_tree        = Path(dir_tree)
-        self.dir_mafft       = Path(dir_mafft)
-        self.tree_ending     = tree_ending
-        self.treefile_files  = list(Path(os.path.join(self.dir_mafft, f)) for f in os.listdir(self.dir_mafft) if f.endswith(self.tree_ending))
-        self.relative_cutoff = relative_cutoff
-        self.absolute_cutoff = absolute_cutoff
-        self.contig_dct      = contig_dct
-        self.hcolor          = hcolor
-        self.outlier_ratio   = outlier_ratio
+        self.dir_tree            = Path(dir_tree)
+        self.dir_mafft           = Path(dir_mafft)
+        self.tree_ending         = tree_ending
+        self.treefile_files      = list(Path(os.path.join(self.dir_mafft, f)) for f in os.listdir(self.dir_mafft) if f.endswith(self.tree_ending))
+        self.relative_cutoff     = relative_cutoff
+        self.absolute_cutoff     = absolute_cutoff
+        self.contig_dct          = contig_dct
+        self.hcolor              = hcolor
+        self.outlier_ratio       = outlier_ratio
         self.max_trim_iterations = max_trim_iterations
-        self.min_tree_leaves = min_tree_leaves
+        self.min_tree_leaves     = min_tree_leaves
 
     def check_contrast_outlier(self, node0, node1, above0, above1, relative_cutoff):
         if node0.is_leaf() and above0 > relative_cutoff:
@@ -97,9 +97,9 @@ class TrimTips:
             node_node, root_node = remove_kink(node_node, root_node)
             tree = Tree(root_node._ete_node.write(format=1))
 
-        going = True
+        going     = True
         iteration = 0
-        max_iterations = self.max_trim_iterations  # Use parameter instead of hardcoded 10
+        max_iterations = self.max_trim_iterations
         while going and tree is not None and len(tree.get_leaves()) > 3 and iteration < max_iterations:
             iteration += 1
             going = False
@@ -135,8 +135,8 @@ class TrimTips:
                     self.set_node_length(node, total_len / len(children))
                     
                     for child1, child2 in combinations(children, 2):
-                        above1 = self.get_node_length(child1)
-                        above2 = self.get_node_length(child2)
+                        above1  = self.get_node_length(child1)
+                        above2  = self.get_node_length(child2)
                         outlier = self.check_contrast_outlier(child1, child2, above1, above2, relative_cutoff)
                         if outlier is not None:
                             tree = self.remove_a_tip(tree, outlier)
@@ -155,36 +155,35 @@ class TrimTips:
     def run(self):
         file_count = len(self.treefile_files)
 
-        # Initialize metrics dictionary
         metrics = {
             'trimming_thresholds': {
                 'relative_cutoff': self.relative_cutoff,
                 'absolute_cutoff': self.absolute_cutoff
             },
-            'total_trees': file_count,
+            'total_trees'    : file_count,
             'processed_count': 0,
-            'error_count': 0,
-            'skipped_count': 0,
-            'file_details': []
+            'error_count'    : 0,
+            'skipped_count'  : 0,
+            'file_details'   : []
         }
 
         for tree_file in self.treefile_files:
             file_metrics = {
-                'filename': tree_file.name,
-                'stem': tree_file.stem,
-                'status': '',
-                'error': None,
+                'filename'     : tree_file.name,
+                'stem'         : tree_file.stem,
+                'status'       : '',
+                'error'        : None,
                 'leaves_before': 0,
-                'leaves_after': 0
+                'leaves_after' : 0
             }
             
             try:
                 with open(tree_file, 'r') as infile:
                     tree_str = infile.readline().strip()
                     if not tree_str:
-                        metrics['skipped_count'] += 1
-                        file_metrics['error'] = 'empty tree string'
-                        file_metrics['status'] = 'skipped'
+                        metrics['skipped_count']      += 1
+                        file_metrics['error']          = 'empty tree string'
+                        file_metrics['status']         = 'skipped'
                         metrics['file_details'].append(file_metrics)
                         continue
                     
@@ -193,32 +192,41 @@ class TrimTips:
                         file_metrics['leaves_before'] = len(intree.get_leaves())
                     except Exception as e:
                         metrics['error_count'] += 1
-                        file_metrics['error'] = f'parse error: {str(e)}'
-                        file_metrics['status'] = 'error'
+                        file_metrics['error']   = f'parse error: {str(e)}'
+                        file_metrics['status']  = 'error'
                         metrics['file_details'].append(file_metrics)
                         continue
 
                 outtree = self.trim(intree, float(self.relative_cutoff), float(self.absolute_cutoff))
                 if outtree is None:
                     metrics['skipped_count'] += 1
-                    file_metrics['error'] = 'trimming resulted in null tree'
-                    file_metrics['status'] = 'skipped'
+                    file_metrics['error']     = 'trimming resulted in null tree'
+                    file_metrics['status']    = 'skipped'
                     metrics['file_details'].append(file_metrics)
                     continue
 
-                file_metrics['leaves_after'] = len(outtree.get_leaves())
-                if len(outtree.get_leaves()) < self.min_tree_leaves:
+                file_metrics['leaves_after']  = len(outtree.get_leaves())
+                if len(outtree.get_leaves())  < self.min_tree_leaves:
                     metrics['skipped_count'] += 1
-                    file_metrics['error'] = f'insufficient leaves after trimming ({len(outtree.get_leaves())} < {self.min_tree_leaves})'
-                    file_metrics['status'] = 'skipped'
+                    file_metrics['error']     = f'insufficient leaves after trimming ({len(outtree.get_leaves())} < {self.min_tree_leaves})'
+                    file_metrics['status']    = 'skipped'
                     metrics['file_details'].append(file_metrics)
                     continue
 
+                leaves_before = file_metrics['leaves_before']
+                leaves_after  = file_metrics['leaves_after']
+                
                 tree_name = tree_file.with_suffix('.tt')
                 with open(tree_name, 'w') as outfile:
                     outfile.write(tostring(outtree) + ';\n')
+                
                 metrics['processed_count'] += 1
-                file_metrics['status'] = 'processed'
+                if leaves_before != leaves_after:
+                    file_metrics['status'] = 'processed'
+                    file_metrics['modified'] = True
+                else:
+                    file_metrics['status'] = 'unchanged'
+                    file_metrics['modified'] = False
                 metrics['file_details'].append(file_metrics)
 
             except Exception as e:

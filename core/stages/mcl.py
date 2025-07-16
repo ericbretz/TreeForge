@@ -1,10 +1,10 @@
 import os
 import sys
-import subprocess
-from pathlib import Path
-import numpy as np
 import pysam
-from typing import Dict, Tuple
+import subprocess
+import numpy as np
+from pathlib             import Path
+from typing              import Dict, Tuple
 from core.utils.printout import PrintOut
 
 class MCL:

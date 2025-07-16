@@ -1,8 +1,7 @@
 import os
-from ete3 import Tree
-from typing import Dict, List, Tuple, Optional
-from dataclasses import dataclass
-from pathlib import Path
+from typing                import Dict, Optional
+from dataclasses           import dataclass
+from pathlib               import Path
 from core.treeutils.newick import parse, tostring
 from core.treeutils.phylo  import Node
 from core.treeutils.seq    import read_fasta_file
@@ -24,68 +23,67 @@ class MaskTips:
                  min_tree_leaves
                  ):
         
-        self.dir_tree    = Path(dir_tree)
-        self.dir_cln     = Path(dir_cln)
-        self.cln_files   = list(Path(os.path.join(self.dir_cln, f)) for f in os.listdir(self.dir_cln) if f.endswith('.cln'))
-        self.para        = para
-        self.tree_ending = tree_ending
-        self.tree_files  = list(Path(os.path.join(self.dir_cln, f)) for f in os.listdir(self.dir_cln) if f.endswith(self.tree_ending))
-        self.hcolor      = hcolor
+        self.dir_tree        = Path(dir_tree)
+        self.dir_cln         = Path(dir_cln)
+        self.cln_files       = list(Path(os.path.join(self.dir_cln, f)) for f in os.listdir(self.dir_cln) if f.endswith('.cln'))
+        self.para            = para
+        self.tree_ending     = tree_ending
+        self.tree_files      = list(Path(os.path.join(self.dir_cln, f)) for f in os.listdir(self.dir_cln) if f.endswith(self.tree_ending))
+        self.hcolor          = hcolor
         self.min_tree_leaves = min_tree_leaves
-        self.return_dict = {'tree': {}}
+        self.return_dict     = {'tree': {}}
         
         self.metrics = {
-            'trees_processed': 0,
-            'trees_skipped': 0,
+            'trees_processed'         : 0,
+            'trees_skipped'           : 0,
             'monophyletic_tips_masked': 0,
             'paraphyletic_tips_masked': 0,
-            'clusters_processed': 0,
-            'clusters_skipped': 0,
-            'file_read_errors': 0,
-            'tree_parse_errors': 0,
-            'invalid_tree_errors': 0,
-            'cln_read_errors': 0,
-            'duplicate_cluster_ids': 0,
-            'missing_cln_files': 0
+            'clusters_processed'      : 0,
+            'clusters_skipped'        : 0,
+            'file_read_errors'        : 0,
+            'tree_parse_errors'       : 0,
+            'invalid_tree_errors'     : 0,
+            'cln_read_errors'         : 0,
+            'duplicate_cluster_ids'   : 0,
+            'missing_cln_files'       : 0
         }
         
-        cln_ids = {self.get_cluster_id(os.path.basename(f)) for f in self.cln_files}
-        tree_ids = {self.get_cluster_id(os.path.basename(f)) for f in self.tree_files}
+        cln_ids      = {self.get_cluster_id(os.path.basename(f)) for f in self.cln_files}
+        tree_ids     = {self.get_cluster_id(os.path.basename(f)) for f in self.tree_files}
         matching_ids = cln_ids.intersection(tree_ids)
         
     def run(self):
-        # Initialize comprehensive metrics dictionary
         metrics = {
             'masking_settings': {
-                'mask_paraphyletic': self.para.lower() == 'y',
-                'tree_ending': self.tree_ending
+                'mask_paraphyletic' : self.para.lower() == 'y',
+                'tree_ending'       : self.tree_ending
             },
             'file_counts': {
-                'total_cln_files': len(self.cln_files),
-                'total_tree_files': len(self.tree_files)
+                'total_cln_files'   : len(self.cln_files),
+                'total_tree_files'  : len(self.tree_files)
             },
             'processing_results': {
-                'trees_processed': 0,
-                'trees_skipped': 0,
+                'trees_processed'   : 0,
+                'trees_skipped'     : 0,
                 'clusters_processed': 0,
-                'clusters_skipped': 0
+                'clusters_skipped'  : 0
             },
             'masking_results': {
                 'monophyletic_tips_masked': 0,
                 'paraphyletic_tips_masked': 0
             },
             'errors': {
-                'file_read_errors': 0,
-                'tree_parse_errors': 0,
-                'invalid_tree_errors': 0,
-                'cln_read_errors': 0,
+                'file_read_errors'     : 0,
+                'tree_parse_errors'    : 0,
+                'invalid_tree_errors'  : 0,
+                'cln_read_errors'      : 0,
                 'duplicate_cluster_ids': 0,
-                'missing_cln_files': 0
+                'missing_cln_files'    : 0
             },
             'file_details': []
         }
         
-        mask_para = self.para.lower() == 'y'    #Mask paraphyletic tips?
+        mask_para = self.para.lower() == 'y'
         file_match = {}
 
         for cf in self.cln_files:
@@ -97,31 +95,31 @@ class MaskTips:
         
         for tf in self.tree_files:
             file_metrics = {
-                'filename': tf.name,
-                'cluster_id': self.get_cluster_id(os.path.basename(tf)),
-                'status': '',
-                'error': None,
-                'leaves_before': 0,
-                'leaves_after': 0,
+                'filename'           : tf.name,
+                'cluster_id'         : self.get_cluster_id(os.path.basename(tf)),
+                'status'             : '',
+                'error'              : None,
+                'leaves_before'      : 0,
+                'leaves_after'       : 0,
                 'monophyletic_masked': 0,
                 'paraphyletic_masked': 0
             }
             
             cluster_id = self.get_cluster_id(os.path.basename(tf))
             if cluster_id not in file_match:
-                metrics['processing_results']['clusters_skipped'] += 1
-                metrics['errors']['missing_cln_files'] += 1
-                file_metrics['error'] = 'no matching CLN file found'
-                file_metrics['status'] = 'skipped'
+                metrics['processing_results']['clusters_skipped']      += 1
+                metrics['errors']['missing_cln_files']                 += 1
+                file_metrics['error']                                   = 'no matching CLN file found'
+                file_metrics['status']                                  = 'skipped'
                 metrics['file_details'].append(file_metrics)
                 continue
 
             metrics['processing_results']['clusters_processed'] += 1
-            cln_path = Path(file_match[cluster_id])
+            cln_path  = Path(file_match[cluster_id])
             tree_data = self.process_tree_file(tf, cln_path, mask_para)
             if tree_data is None:
                 metrics['processing_results']['trees_skipped'] += 1
-                file_metrics['error'] = 'failed to process tree file'
+                file_metrics['error']  = 'failed to process tree file'
                 file_metrics['status'] = 'skipped'
                 metrics['file_details'].append(file_metrics)
                 continue
@@ -131,7 +129,7 @@ class MaskTips:
             curroot = self.mask_monophyletic_tips(tree_data.tree, tree_data.char_dict)
             if curroot is None:
                 metrics['processing_results']['trees_skipped'] += 1
-                file_metrics['error'] = 'monophyletic masking failed'
+                file_metrics['error']  = 'monophyletic masking failed'
                 file_metrics['status'] = 'skipped'
                 metrics['file_details'].append(file_metrics)
                 continue
@@ -140,7 +138,7 @@ class MaskTips:
                 curroot = self.mask_paraphyletic_tips(curroot, tree_data.char_dict)
                 if curroot is None:
                     metrics['processing_results']['trees_skipped'] += 1
-                    file_metrics['error'] = 'paraphyletic masking failed'
+                    file_metrics['error']  = 'paraphyletic masking failed'
                     file_metrics['status'] = 'skipped'
                     metrics['file_details'].append(file_metrics)
                     continue
@@ -148,20 +146,29 @@ class MaskTips:
             file_metrics['leaves_after'] = len(curroot.leaves())
             file_metrics['monophyletic_masked'] = self.metrics['monophyletic_tips_masked']
             file_metrics['paraphyletic_masked'] = self.metrics['paraphyletic_tips_masked']
-            file_metrics['status'] = 'processed'
+            
+            leaves_before = file_metrics['leaves_before']
+            leaves_after  = file_metrics['leaves_after']
+            
+            if leaves_before != leaves_after:
+                file_metrics['status']   = 'processed'
+                file_metrics['modified'] = True
+            else:
+                file_metrics['status']   = 'unchanged'
+                file_metrics['modified'] = False
+                
             metrics['file_details'].append(file_metrics)
             
             self.write_tree(curroot, os.path.basename(tf))
 
-        # Update final metrics from the instance metrics
         metrics['masking_results']['monophyletic_tips_masked'] = self.metrics['monophyletic_tips_masked']
         metrics['masking_results']['paraphyletic_tips_masked'] = self.metrics['paraphyletic_tips_masked']
-        metrics['errors']['file_read_errors'] = self.metrics['file_read_errors']
-        metrics['errors']['tree_parse_errors'] = self.metrics['tree_parse_errors']
-        metrics['errors']['invalid_tree_errors'] = self.metrics['invalid_tree_errors']
-        metrics['errors']['cln_read_errors'] = self.metrics['cln_read_errors']
-        metrics['errors']['duplicate_cluster_ids'] = self.metrics['duplicate_cluster_ids']
-        metrics['errors']['missing_cln_files'] = self.metrics['missing_cln_files']
+        metrics['errors']['file_read_errors']                  = self.metrics['file_read_errors']
+        metrics['errors']['tree_parse_errors']                 = self.metrics['tree_parse_errors']
+        metrics['errors']['invalid_tree_errors']               = self.metrics['invalid_tree_errors']
+        metrics['errors']['cln_read_errors']                   = self.metrics['cln_read_errors']
+        metrics['errors']['duplicate_cluster_ids']             = self.metrics['duplicate_cluster_ids']
+        metrics['errors']['missing_cln_files']                 = self.metrics['missing_cln_files']
 
         return metrics
 

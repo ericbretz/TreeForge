@@ -1,25 +1,18 @@
 import os
 import sys
-from pathlib import Path
 import pysam
 import subprocess
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from concurrent.futures import wait
-from core.treeutils.newick import parse
-from core.utils.printout import PrintOut
+from pathlib                import Path
+from threading              import Lock
+from core.treeutils.newick  import parse
+from core.utils.printout    import PrintOut
+from queue                  import Queue, Empty
+from concurrent.futures     import ThreadPoolExecutor, as_completed
+
 
 """
-PARALLEL FLOW:
-
-ThreadPoolExecutor
-    │
-    ├─ Worker 1: .fa → PRANK → .fas → pxclsq → -cln → iqtree2 → .treefile
-    │
-    ├─ Worker 2: .fa → PRANK → .fas → pxclsq → -cln → iqtree2 → .treefile
-    │
-    ├─ Worker 3: .fa → PRANK → .fas → pxclsq → -cln → iqtree2 → .treefile
-    │
-    └─ Worker N: .fa → PRANK → .fas → pxclsq → -cln → iqtree2 → .treefile
+Run prank, pxcslq, iqtree2. This will dynamically adjust the number of workers based on the number of threads.
+it also reallocates workers after each stage to make things move faster.
 """
 
 class Prank:
@@ -35,21 +28,26 @@ class Prank:
                  bc,
                  prank_pxclsq_threshold,
                  bootstrap_replicates):
-        self.dir_ortho1to1 = Path(dir_ortho1to1)
-        self.dir_prank     = Path(dir_prank)
-        self.infile_ending = infile_ending
-        self.dna_aa        = dna_aa
-        self.concat_fasta  = concat_fasta
-        self.threads       = threads
-        self.log           = log
-        self.hc            = hc
-        self.bc            = bc
+        self.dir_ortho1to1          = Path(dir_ortho1to1)
+        self.dir_prank              = Path(dir_prank)
+        self.infile_ending          = infile_ending
+        self.dna_aa                 = dna_aa
+        self.concat_fasta           = concat_fasta
+        self.threads                = threads
+        self.log                    = log
+        self.hc                     = hc
+        self.bc                     = bc
         self.prank_pxclsq_threshold = prank_pxclsq_threshold
-        self.bootstrap_replicates    = bootstrap_replicates
-        self.return_dict   = {}
+        self.bootstrap_replicates   = bootstrap_replicates
+        self.return_dict            = {}
 
-        self.printClass    = PrintOut(log, hc, bc)
-        self.printout      = self.printClass.printout
+        self.prank_workers          = max(1, int(threads * 0.4))
+        self.pxclsq_workers         = max(1, int(threads * 0.2))
+        self.iqtree_workers         = max(1, int(threads * 0.4))
+        self.iqtree_threads_per_job = 2
+
+        self.printClass             = PrintOut(log, hc, bc)
+        self.printout               = self.printClass.printout
 
     def run(self):
         self.write_fasta_from_tree()
@@ -66,7 +64,7 @@ class Prank:
             for node in intree.iternodes():
                 if node.is_leaf():
                     leaf_count += 1
-                    parts = node.name.split('_')
+                    parts       = node.name.split('_')
                     if len(parts) >= 2:
                         if len(parts) == 2:
                             fasta_id = f"{parts[0]}@{parts[1]}"
@@ -79,35 +77,14 @@ class Prank:
             for entry in fasta:
                 if entry.name in seq_mapping:
                     tree_name, orig_name = seq_mapping[entry.name]
-                    outfile_path = os.path.join(self.dir_prank, f"{tree_name}.fa")
+                    outfile_path         = os.path.join(self.dir_prank, f"{tree_name}.fa")
                     mode = 'w' if outfile_path not in created_files else 'a'
-                    # if '_' in orig_name:
-                    #     name_parts = orig_name.rsplit('_', 1)
-                    #     orig_name = name_parts[0]
-                    # elif '@' in orig_name:
-                    #     orig_name = orig_name.split('@')[0]
                     with open(outfile_path, mode) as outfile:
                         outfile.write(f">{orig_name}\n{entry.sequence}\n")
                     if mode == 'w':
                         created_files.add(outfile_path)
-
-    def run_parallel(self, func, files, max_workers, step_name):
-        results         = []
-        total_files     = len(files)
-        completed_files = 0
         
-        self.printout('metric', step_name)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(func, f): f for f in files}
-            
-            for future in as_completed(futures):
-                result           = future.result()
-                completed_files += 1
-                input_file       = futures[future]
-                cluster_name     = input_file.stem
-                self.printout('metric', {'cluster': cluster_name.split("_")[0], 'completed': completed_files, 'total': total_files})
-                results.append(result)
-        return results
+        self.printout('metric', f'Created {len(created_files)} FASTA files from tree data')
 
     def run_prank_single(self, fa_file):
         out_base = fa_file.with_suffix('')
@@ -135,115 +112,141 @@ class Prank:
         return out_file
 
     def run_iqtree_single(self, cln_file):
-        threads_per_job = max(1, self.threads // 4)
-        cmd             = f"iqtree2 -s {cln_file} -nt {threads_per_job} -bb {self.bootstrap_replicates} -redo -m GTR+G"
-        iqtree          = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        cmd    = f"iqtree2 -s {cln_file} -nt {self.iqtree_threads_per_job} -bb {self.bootstrap_replicates} -redo -m GTR+G"
+        iqtree = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         
         if iqtree.returncode not in [0,2]:
-            self.printout('error', 'IQ-TREE failed')
+            self.printout('error', 'IQ-TREE2 failed')
             self.printout('error', iqtree.stderr.decode('utf-8'))
             sys.exit(1)
         return cln_file.with_suffix('.treefile')
 
-    def run_staged_parallel(self, files, max_workers):
-        results = []
-        total_files = len(files)
-        completed_prank = 0
+    def run_optimized(self, files):
+        results          = []
+        total_files      = len(files)
+        completed_prank  = 0
         completed_pxclsq = 0
         completed_iqtree = 0
+        prank_queue      = Queue()
+        pxclsq_queue     = Queue()
+        iqtree_queue     = Queue()
         
-        total_steps = total_files * 3
-        completed_steps = 0
+        progress_lock = Lock()
+        
+        def update_progress(stage, increment=1):
+            nonlocal completed_prank, completed_pxclsq, completed_iqtree
+            with progress_lock:
+                if stage == 'prank':
+                    completed_prank += increment
+                    percentage       = f'{completed_prank/total_files*100:.1f}%'
+                    self.printout('progress', f"Prank: {completed_prank}/{total_files} ({percentage})")
+                elif stage == 'pxclsq':
+                    completed_pxclsq += increment
+                    percentage        = f'{completed_pxclsq/total_files*100:.1f}%'
+                    self.printout('progress', f"Pxclsq: {completed_pxclsq}/{total_files} ({percentage})")
+                elif stage == 'iqtree':
+                    completed_iqtree += increment
+                    percentage        = f'{completed_iqtree/total_files*100:.1f}%'
+                    self.printout('progress', f"Iqtree2: {completed_iqtree}/{total_files} ({percentage})")
 
-        self.printout('progress', f"PRANK: {completed_steps:0{len(str(total_steps))}d}/{total_steps} (P:{completed_prank:0{len(str(total_files))}d}/{total_files} px:{completed_pxclsq:0{len(str(total_files))}d}/{total_files} IQ:{completed_iqtree:0{len(str(total_files))}d}/{total_files})")
-        
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            prank_futures = {
-                executor.submit(self.run_prank_single, f): f 
-                for f in files
-            }
-            
-            running_pxclsq = set()
-            running_iqtree = set()
-            pxclsq_futures = {}
-            iqtree_futures = {}
-            
-            while prank_futures or pxclsq_futures or iqtree_futures:
-                done, _ = wait(
-                    list(prank_futures.keys()) + 
-                    list(pxclsq_futures.keys()) + 
-                    list(iqtree_futures.keys()),
-                    return_when='FIRST_COMPLETED'
-                )
-                
-                for future in done:
-                    if future in prank_futures:
-                        input_file = prank_futures[future]
-                        cluster_name = input_file.stem.split("_")[0]
-                        prank_result = future.result()
-                        completed_prank += 1
-                        completed_steps += 1
-                        
-                        self.printout('progress', f"{completed_steps}/{total_steps} (P:{completed_prank}/{total_files} px:{completed_pxclsq}/{total_files} IQ:{completed_iqtree}/{total_files})")
-                        
-                        if len(running_pxclsq) < max_workers:
-                            pxclsq_future = executor.submit(self.run_pxclsq_single, prank_result)
-                            pxclsq_futures[pxclsq_future] = prank_result
-                            running_pxclsq.add(prank_result)
-                        
-                        del prank_futures[future]
-                        
-                    elif future in pxclsq_futures:
-                        input_file = pxclsq_futures[future]
-                        cluster_name = input_file.stem.split("_")[0]
-                        pxclsq_result = future.result()
-                        completed_pxclsq += 1
-                        completed_steps += 1
-                        
-                        self.printout('progress', f"{completed_steps}/{total_steps} (P:{completed_prank}/{total_files} px:{completed_pxclsq}/{total_files} IQ:{completed_iqtree}/{total_files})")
-                        
-                        running_pxclsq.remove(input_file)
-                        
-                        if len(running_iqtree) < max(1, self.threads // 4):
-                            iqtree_future = executor.submit(self.run_iqtree_single, pxclsq_result)
-                            iqtree_futures[iqtree_future] = pxclsq_result
-                            running_iqtree.add(pxclsq_result)
-                        
-                        del pxclsq_futures[future]
-                        
-                    elif future in iqtree_futures:
-                        input_file = iqtree_futures[future]
-                        cluster_name = input_file.stem.split("_")[0]
-                        tree_result = future.result()
-                        completed_iqtree += 1
-                        completed_steps += 1
-                        
-                        self.printout('progress', f"{completed_steps}/{total_steps} (P:{completed_prank}/{total_files} px:{completed_pxclsq}/{total_files} IQ:{completed_iqtree}/{total_files})")
-                        
-                        running_iqtree.remove(input_file)
-                        results.append(tree_result)
-                        del iqtree_futures[future]
-                
-                while len(running_pxclsq) < max_workers and completed_prank > len(pxclsq_futures) + completed_pxclsq:
-                    for prank_result in [r for r in results if r not in running_pxclsq and r not in running_iqtree]:
-                        pxclsq_future = executor.submit(self.run_pxclsq_single, prank_result)
-                        pxclsq_futures[pxclsq_future] = prank_result
-                        running_pxclsq.add(prank_result)
+        for file in files:
+            prank_queue.put(file)
+
+        def prank_worker():
+            while True:
+                try:
+                    fa_file = prank_queue.get(timeout=1)
+                    if fa_file is None:
                         break
-                
-                iqtree_max = max(1, self.threads // 4)
-                while len(running_iqtree) < iqtree_max and completed_pxclsq > len(iqtree_futures) + completed_iqtree:
-                    for pxclsq_result in [r for r in results if r not in running_iqtree]:
-                        iqtree_future = executor.submit(self.run_iqtree_single, pxclsq_result)
-                        iqtree_futures[iqtree_future] = pxclsq_result
-                        running_iqtree.add(pxclsq_result)
+                    
+                    fas_result = self.run_prank_single(fa_file)
+                    pxclsq_queue.put(fas_result)
+                    update_progress('prank')
+                    
+                except Empty:
+                    break
+
+        def pxclsq_worker():
+            while True:
+                try:
+                    fas_file = pxclsq_queue.get(timeout=1)
+                    if fas_file is None:
                         break
+                    
+                    cln_result = self.run_pxclsq_single(fas_file)
+                    iqtree_queue.put(cln_result)
+                    update_progress('pxclsq')
+                    
+                except Empty:
+                    break
+
+        def iqtree_worker():
+            while True:
+                try:
+                    cln_file = iqtree_queue.get(timeout=1)
+                    if cln_file is None:
+                        break
+                    
+                    tree_result = self.run_iqtree_single(cln_file)
+                    results.append(tree_result)
+                    update_progress('iqtree')
+                    
+                except Empty:
+                    break
+
+        with ThreadPoolExecutor(max_workers=self.prank_workers + self.pxclsq_workers + self.iqtree_workers) as executor:
+            prank_futures = [executor.submit(prank_worker) for _ in range(self.prank_workers)]
+            
+            for future in as_completed(prank_futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    self.printout('error', f'Prank worker failed: {e}')
+                    sys.exit(1)
+            
+            for _ in range(self.prank_workers):
+                prank_queue.put(None)
+            
+            pxclsq_futures = [executor.submit(pxclsq_worker) for _ in range(self.pxclsq_workers)]
+            
+            for future in as_completed(pxclsq_futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    self.printout('error', f'Pxclsq worker failed: {e}')
+                    sys.exit(1)
+            
+            iqtree_futures = [executor.submit(iqtree_worker) for _ in range(self.iqtree_workers)]
+            
+            for future in as_completed(iqtree_futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    self.printout('error', f'Iqtree worker failed: {e}')
+                    sys.exit(1)
+
+        self.printout('metric', f'Generated {len(results)} trees')
         return results
 
+    def _reallocate_resources_after_prank(self):
+        available_threads   = self.threads - self.prank_workers
+        new_pxclsq_workers  = max(1, int(available_threads * 0.6))
+        new_iqtree_workers  = max(1, available_threads - new_pxclsq_workers)
+        self.pxclsq_workers = new_pxclsq_workers
+        self.iqtree_workers = new_iqtree_workers
+
+    def _reallocate_resources_after_pxclsq(self):
+        available_threads   = self.threads - self.prank_workers - self.pxclsq_workers
+        new_iqtree_workers  = max(1, available_threads // 2)
+        self.iqtree_workers = new_iqtree_workers
+
     def process_alignments(self):
-        fa_files    = list(self.dir_prank.glob('*.fa'))
-        max_workers = max(1, self.threads - 2)
-        trees       = self.run_staged_parallel(fa_files, max_workers)
+        fa_files = list(self.dir_prank.glob('*.fa'))        
+        if not fa_files:
+            self.printout('error', 'No FASTA files found for processing')
+            return
+        
+        trees = self.run_optimized(fa_files)
         
         self.return_dict.update({
             'alignments': list(self.dir_prank.glob('*.fas')),
