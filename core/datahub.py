@@ -68,6 +68,7 @@ class DataHub:
         
         # Super 
         self.super_bootstrap            = args.super_bootstrap              # Supermatrix bootstrap replicates
+        self.bes_support                = args.bes_support                  # BES support
         
         # Terminal
         self.hc                         = args.highlight_color              # Highlight color
@@ -413,10 +414,15 @@ class DataHub:
         if gene_tree_count is None:
             gene_tree_count = len(glob(os.path.join(self.dir_treeforge, 'gene_trees', '*.tre')))
         
-        out_dict = {'Species Tree'   : os.path.join(self.dir_treeforge, 'SpeciesTree.tre'),
-                    'Metrics CSV'    : os.path.join(self.dir_treeforge, 'summary.csv'),
-                    'Gene Trees'     : os.path.join(self.dir_treeforge, 'gene_trees'),
-                    'Gene Tree Count': gene_tree_count,
+        out_dict = {'Species Tree'   : '',
+                    '   Molecular'   : os.path.join(self.dir_treeforge, 'SpeciesTree.molecular.tre'),
+                    '   Coalescent'  : os.path.join(self.dir_treeforge, 'SpeciesTree.coalescent.tre'),
+                    'CSV'            : '',
+                    '   Metrics'     : os.path.join(self.dir_treeforge, 'summary.csv'),
+                    '   Verbose'     : os.path.join(self.dir_treeforge, 'SpeciesTree.verbose.csv'),
+                    'Gene Trees'     : '',
+                    '   Directory'   : os.path.join(self.dir_treeforge, 'gene_trees'),
+                    '   Count'       : gene_tree_count,
                     }
         if self.output_super_matrix:
             out_dict['SuperMatrix'] = os.path.join(self.dir_treeforge, 'SuperMatrix.tre')
@@ -691,6 +697,7 @@ class DataHub:
                         self.threads,                                                   # Number of threads
                         self.log,                                                       # Log level
                         self.hc,                                                        # Highlight color
-                        self.bc)                                                        # Background color
+                        self.bc,                                                        # Background color
+                        self.bes_support)                                               # BES support
         astral.run()
         return astral.return_dict

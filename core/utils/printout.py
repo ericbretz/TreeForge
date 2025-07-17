@@ -117,10 +117,17 @@ class PrintOut:
             'relative_cutoff'         : 'Relative Cutoff',
             'absolute_cutoff'         : 'Absolute Cutoff',
             'trimmed'                 : 'Trimmed Dir',
+            'modified_files_count'    : 'Modified Files',
+            'files_moved_to_prune'    : 'Moved to Prune',
+            'error_count'             : 'Error Count',
+            'skipped_count'           : 'Skipped Count',
             # Prune
             'ortho1to1'               : 'Orthologs',
             'ortho1to1_dir'           : 'Ortho Directory',
             'ortho1to1_count'         : 'Ortho Count',
+            'ortho_mi_count'          : 'Ortho MI Count',
+            'pruned_trees'            : 'Pruned Trees',
+            'skipped_trees'           : 'Skipped Trees',
             # Prank
             'alignments'              : 'Alignments',
             'cleaned_alignments'      : 'Cleaned Aln',

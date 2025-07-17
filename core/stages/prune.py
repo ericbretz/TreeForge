@@ -34,7 +34,7 @@ class Prune:
         self.hc                  = hc
         self.bc                  = bc
 
-        self.subtree_files       = [Path(os.path.join(dir_trimmed, f)) for f in os.listdir(dir_trimmed) if f.endswith('.subtree')]
+        self.subtree_files       = [Path(os.path.join(dir_prune, f)) for f in os.listdir(dir_prune) if f.endswith('.subtree')]
         self.relative_tip_cutoff = prune_relative_cutoff
         self.absolute_tip_cutoff = prune_absolute_cutoff
         self.minimum_taxa        = orthocutoff

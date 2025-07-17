@@ -52,6 +52,8 @@ class Prank:
     def run(self):
         self.write_fasta_from_tree()
         self.process_alignments()
+        if os.path.exists('phyx.logfile'):
+            os.remove('phyx.logfile')
         return self.return_dict
 
     def write_fasta_from_tree(self):

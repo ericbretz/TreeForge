@@ -4,6 +4,7 @@ import ete3
 import shutil
 import subprocess
 from core.utils.printout import PrintOut
+from core.utils.bes import BES
 
 class Astral:
     def __init__(self,
@@ -16,10 +17,12 @@ class Astral:
                  threads,
                  log,
                  hcolor,
-                 bcolor):
+                 bcolor,
+                 bes_support):
         self.dir_prank           = dir_prank
         self.dir_super           = dir_super
         self.dir_treeforge       = dir_treeforge
+        self.bes_support         = bes_support
         self.renamed_map         = renamed_map
         self.output_super_matrix = output_super_matrix
         self.super_bootstrap     = super_bootstrap
@@ -31,7 +34,7 @@ class Astral:
         self.cln_files           = ' '.join([os.path.join(self.dir_prank, f) for f in os.listdir(self.dir_prank) if f.endswith('.treefile')])
         self.pxcat_files         = ' '.join([os.path.join(self.dir_prank, f) for f in os.listdir(self.dir_prank) if f.endswith('-cln')])
         self.concat_tree         = os.path.join(self.dir_super,     'concat.tre')
-        self.finaltree           = os.path.join(self.dir_treeforge, 'SpeciesTree.tre')
+        self.finaltree           = os.path.join(self.dir_treeforge, 'SpeciesTree.coalescent.tre')
         self.supermatrix         = os.path.join(self.dir_super,     'SuperMatrix.treefile')
         self.genetree            = os.path.join(self.dir_treeforge, 'SuperMatrix.tre')
         self.dir_gene_trees      = os.path.join(self.dir_treeforge, 'gene_trees')
@@ -52,6 +55,7 @@ class Astral:
         if self.output_super_matrix:
             self.pxcat()
             self.iqtree()
+        self.bes()
         return self.return_dict
     
     def file_check(self):
@@ -118,16 +122,22 @@ class Astral:
             self.printout('error', 'PXCAT failed')
             self.printout('error', return_code.stderr.decode('utf-8'))
             sys.exit(1)
+        if os.path.exists("phyx.logfile"):
+            os.remove("phyx.logfile")
 
     def iqtree(self):
         self.printout('metric', 'SuperMatrix')
         file_dir    = os.path.join(self.dir_super, 'SuperMatrix')
         cmd         = f'iqtree2 -s {self.s_matrix_dir} -spp {self.s_model_dir} -nt {self.threads} -bb {self.super_bootstrap} -m GTR+G -pre {file_dir} -redo'
         return_code = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # return_code = subprocess.run(cmd, shell=True)
         if return_code.returncode != 0:
             self.printout('error', 'IQ-TREE SuperMatrix failed')
             self.printout('error', return_code.stderr.decode('utf-8'))
             sys.exit(1)
         if os.path.exists(self.supermatrix):
             shutil.move(self.supermatrix, self.genetree)
+
+    def bes(self):
+        self.printout('metric', 'Convert Coalescent Distance to Molecular Distance')
+        bes_runner = BES(printout=self.printout)
+        bes_runner.run(self.finaltree, self.concat_tree, self.bes_support, self.dir_treeforge)
