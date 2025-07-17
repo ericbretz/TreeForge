@@ -133,7 +133,7 @@ class Tree:
         
         if 'file_details' in result:
             for file_detail in result['file_details']:
-                if file_detail.get('status') in ['cut', 'copied_original']:
+                if file_detail.get('status') == 'cut':
                     cluster_id = get_clusterID(file_detail['filename'])
                     self.modified_files.add(cluster_id)
 
@@ -214,11 +214,11 @@ class Tree:
         current_iter_dir = self.dir_trimmed
         subtree_files    = [f for f in os.listdir(current_iter_dir) if f.endswith('.subtree')]
         
-        if not self.final_files:
-            for filename in subtree_files:
-                cluster_id = get_clusterID(filename)
-                if cluster_id not in self.modified_files:
-                    self.final_files.append(os.path.join(current_iter_dir, filename))
+        self.final_files = []
+        for filename in subtree_files:
+            cluster_id = get_clusterID(filename)
+            if cluster_id not in self.modified_files:
+                self.final_files.append(os.path.join(current_iter_dir, filename))
         
         os.makedirs(self.dir_prune, exist_ok=True)
         for file_path in self.final_files:

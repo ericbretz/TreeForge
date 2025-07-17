@@ -47,6 +47,7 @@ class ConfigManager:
             'prank_pxclsq_threshold'   : 0.3,
             'prank_bootstrap'          : 1000,
             'super_bootstrap'          : 1000,
+            'bes_support'              : 0.0,
             'output_super_matrix'      : False,
         }
     
@@ -86,6 +87,7 @@ class ConfigManager:
             'prank_pxclsq_threshold'   : 'float',
             'prank_bootstrap'          : 'integer',
             'super_bootstrap'          : 'integer',
+            'bes_support'              : 'float',
             'output_super_matrix'      : 'boolean',
         }
     

@@ -130,7 +130,14 @@ def remove_empty_dirs(root_dir, protected_dirs, printout):
 
 def final_cleanup(root_dir, logs_dir, printout, protected_files, protected_dirs, protected_exts):
     if protected_files is None:
-        protected_files = {'SpeciesTree.tre', 'FinalTree.tre', 'summary.csv', 'SuperMatrix.tre'}
+        protected_files = {
+            'SpeciesTree.tre',
+            'FinalTree.tre',
+            'summary.csv',
+            'SuperMatrix.tre',
+            'SpeciesTree.coalescent.tre',
+            'SpeciesTree.molecular.tre'
+        }
     if protected_dirs is None:
         protected_dirs  = {'logs', 'gene_trees'}
     if protected_exts is None:
@@ -141,6 +148,15 @@ def final_cleanup(root_dir, logs_dir, printout, protected_files, protected_dirs,
         # printout('metric', 'Performing targeted final cleanup')
         pass
     for item in root_dir.rglob('*'):
+        if item.is_file() and item.name == 'phyx.logfile':
+            try:
+                item.unlink()
+                if printout:
+                    pass
+            except OSError as e:
+                if printout:
+                    pass
+            continue
         if item.is_file():
             if item.name in protected_files:
                 continue

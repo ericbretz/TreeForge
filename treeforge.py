@@ -34,7 +34,7 @@ s: Skip Astral
 
 MAJOR = 0
 MINOR = 3
-PATCH = 1
+PATCH = 2
 
 VERSION = f"{MAJOR}.{MINOR}.{PATCH}"
 
@@ -146,16 +146,16 @@ class TreeForge:
         
         # PRANK
         parser.add_argument("--prank-seqtype",              "-ps",  type=str,   help="Sequence type for PRANK",                     default=self.defaults_dict['prank_seqtype'],            choices=['dna', 'aa'])
-        parser.add_argument("--prank-pxclsq-threshold",     "-pp",  type=float, help="pxclsq probability threshold (PRANK)",        default=self.defaults_dict['prank_pxclsq_threshold'])
+        parser.add_argument("--prank-pxclsq-threshold",     "-pp",  type=float, help="pxclsq probability threshold",                default=self.defaults_dict['prank_pxclsq_threshold'])
         parser.add_argument("--prank-bootstrap",            "-pb",  type=int,   help="IQ-TREE bootstrap replicates",                default=self.defaults_dict['prank_bootstrap'])
         
         # Super
         parser.add_argument("--super-bootstrap",            "-sb",  type=int,   help="Supermatrix bootstrap replicates",            default=self.defaults_dict['super_bootstrap'])
-        
+        parser.add_argument("--bes-support",                "-bs",  type=float, help="Molecular distance support",                  default=self.defaults_dict['bes_support'])
         # Configuration
-        parser.add_argument("--config", nargs="?", const=True,      type=str,   help="Path to configuration file",                  default=None)
-        parser.add_argument("--config-create", nargs="?", const="config.yaml", type=str, help="Create a configuration template", default=False)
-        parser.add_argument("--config-save", nargs="?", const="config.yaml", type=str, help="Save current arguments to config file", default=False)
+        parser.add_argument("--config",                             type=str,   help="Path to configuration file",                  default=None,                                           nargs="?", const=True)
+        parser.add_argument("--config-create",                      type=str,   help="Create a configuration template",             default=False,                                          nargs="?", const="config.yaml")
+        parser.add_argument("--config-save",                        type=str,   help="Save current arguments to config file",       default=False,                                          nargs="?", const="config.yaml")
         
         # Standard
         parser.add_argument("--version",                    "-v",               help="Print version",                                                                                       action="store_true",)

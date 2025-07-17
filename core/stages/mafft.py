@@ -64,7 +64,10 @@ class Mafft:
                 'status'         : 'no_files_to_process'
             })
             return self.return_dict
-            
+        
+        if os.path.exists('phyx.logfile'):
+            os.remove('phyx.logfile')
+
         results = self.mafft_thread()
         self.return_mafft(results)
         return self.return_dict

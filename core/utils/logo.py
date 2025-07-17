@@ -102,6 +102,7 @@ def print_help(hcolor, defaults):
         '',
         'SUPER:',
         f'--super-bootstrap           -sb   INT     Supermatrix bootstraps     ({defaults["super_bootstrap"]})',
+        f'--bes-support               -bs   FLOAT   BES support                ({defaults["bes_support"]})',
         '',
         'CONFIG:',
         '--config                          PATH    Path to config file',
