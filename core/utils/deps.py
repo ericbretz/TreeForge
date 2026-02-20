@@ -45,9 +45,7 @@ class Deps:
     
     def check_busco_database(self):
         """Check if BUSCO database file exists"""
-        current_file_dir = Path(__file__).resolve().parent
-        treeforge_root   = current_file_dir.parent.parent
-        busco_db_path    = treeforge_root / 'core' / 'utils' / 'euk_db.faa'
+        busco_db_path = Path(__file__).resolve().parent / 'euk_db.faa'
         
         if busco_db_path.exists():
             self.printout('metric', {'busco_database': 'found'})
