@@ -1,7 +1,9 @@
 import os
 import string
 import random
-from Bio import SeqIO
+import pysam
+from pathlib import Path
+from typing import Tuple, Optional, Dict
 
 """
 This renames the transcripts in fasta files so that treeforge doesnt lock up or crash. including whatever it wraps.
@@ -32,17 +34,61 @@ Final Tree:
    └─── file2
 """
 
+
+class BiDirectionalMapping:
+    def __init__(self):
+        self._forward: Dict[str, Tuple[str, str]] = {}  # new_name -> (original_name, source_file)
+        self._reverse: Dict[str, Tuple[str, str]] = {}  # original_name -> (new_name, source_file)
+    
+    def add(self, new_name: str, original_name: str, source_file: str) -> None:
+        """Add a bidirectional mapping entry."""
+        self._forward[new_name]      = (original_name, source_file)
+        self._reverse[original_name] = (new_name, source_file)
+    
+    def get_by_new_name(self, new_name: str) -> Optional[Tuple[str, str]]:
+        """Get (original_name, source_file) by new_name."""
+        return self._forward.get(new_name)
+    
+    def get_by_original_name(self, original_name: str) -> Optional[Tuple[str, str]]:
+        """Get (new_name, source_file) by original_name."""
+        return self._reverse.get(original_name)
+    
+    def clear(self) -> None:
+        """Clear all mappings."""
+        self._forward.clear()
+        self._reverse.clear()
+    
+    def __len__(self) -> int:
+        """Return the number of mappings."""
+        return len(self._forward)
+    
+    def items_forward(self):
+        """Iterate over forward mappings."""
+        return self._forward.items()
+    
+    def items_reverse(self):
+        """Iterate over reverse mappings."""
+        return self._reverse.items()
+
+
 class Contig:
     def __init__(self, dir_base=".", dir_temp_fasta="."):
-        self.dir_base        = dir_base
-        self.dir_temp_fasta  = dir_temp_fasta
-        self.name_mapping    = {}
-        self.reverse_mapping = {}
+        self.dir_base        = Path(dir_base)
+        self.dir_temp_fasta  = Path(dir_temp_fasta)
+        self.mapping         = BiDirectionalMapping()
         self.current_prefix  = None
         self.counter         = 0
         self.return_dict     = {}
         
-        os.makedirs(self.dir_temp_fasta, exist_ok=True)
+        self.dir_temp_fasta.mkdir(parents=True, exist_ok=True)
+    
+    @property
+    def name_mapping(self) -> Dict[str, Tuple[str, str]]:
+        return self.mapping._forward
+    
+    @property
+    def reverse_mapping(self) -> Dict[str, Tuple[str, str]]:
+        return self.mapping._reverse
 
     def _generate_prefix(self):
         return ''.join(random.choices(string.ascii_uppercase, k=5))
@@ -64,9 +110,10 @@ class Contig:
             prefix = self._generate_prefix()
             self.current_prefix = prefix
             
-            base_name    = os.path.basename(fasta_file)
-            name, ext    = os.path.splitext(base_name)
-            output_file  = os.path.join(self.dir_temp_fasta, f"{name}_renamed{ext}")
+            fasta_path   = Path(fasta_file)
+            name         = fasta_path.stem
+            ext          = fasta_path.suffix
+            output_file  = self.dir_temp_fasta / f"{name}_renamed{ext}"
 
             file_contigs = self._process_fasta_file(fasta_file, output_file, prefix)
             renamed_files.append(output_file)
@@ -78,7 +125,7 @@ class Contig:
             'renamed_files'  : renamed_files,
             'total_contigs'  : total_contigs,
             'files_processed': len(renamed_files),
-            'name_mappings'  : len(self.name_mapping)
+            'name_mappings'  : len(self.mapping)
         }
         return renamed_files
 
@@ -87,65 +134,68 @@ class Contig:
         contig_count = 0
         
         with open(output_file, 'w') as out_handle:
-            for record in SeqIO.parse(input_file, "fasta"):
-                original_name = record.id
-                new_name      = self._generate_new_name(prefix)
-                
-                self.name_mapping[new_name]         = (original_name, source_file)
-                self.reverse_mapping[original_name] = (new_name, source_file)
-                
-                record.id          = new_name
-                record.description = ""
-                SeqIO.write(record, out_handle, "fasta")
-                contig_count += 1
+            with pysam.FastxFile(str(input_file)) as fasta:
+                for entry in fasta:
+                    original_name = entry.name
+                    new_name      = self._generate_new_name(prefix)
+                    
+                    self.mapping.add(new_name, original_name, source_file)
+                    
+                    out_handle.write(f">{new_name}\n{entry.sequence}\n")
+                    contig_count += 1
         
         return contig_count
 
-    def get_original_name(self, new_name):
-        mapping = self.name_mapping.get(new_name)
-        return mapping[0] if mapping else None
+    def get_original_name(self, new_name: str) -> Optional[str]:
+        """Get original name from new name."""
+        result = self.mapping.get_by_new_name(new_name)
+        return result[0] if result else None
 
-    def get_source_file(self, new_name):
-        mapping = self.name_mapping.get(new_name)
-        return mapping[1] if mapping else None
+    def get_source_file(self, new_name: str) -> Optional[str]:
+        """Get source file from new name."""
+        result = self.mapping.get_by_new_name(new_name)
+        return result[1] if result else None
 
-    def get_original_info(self, new_name):
-        return self.name_mapping.get(new_name, (None, None))
+    def get_original_info(self, new_name: str) -> Tuple[Optional[str], Optional[str]]:
+        """Get (original_name, source_file) from new name."""
+        return self.mapping.get_by_new_name(new_name) or (None, None)
 
-    def get_new_name(self, original_name):
-        mapping = self.reverse_mapping.get(original_name)
-        return mapping[0] if mapping else None
+    def get_new_name(self, original_name: str) -> Optional[str]:
+        """Get new name from original name."""
+        result = self.mapping.get_by_original_name(original_name)
+        return result[0] if result else None
 
-    def get_new_info(self, original_name):
-        return self.reverse_mapping.get(original_name, (None, None))
+    def get_new_info(self, original_name: str) -> Tuple[Optional[str], Optional[str]]:
+        """Get (new_name, source_file) from original name."""
+        return self.mapping.get_by_original_name(original_name) or (None, None)
 
-    def save_mapping(self, output_file):
+    def save_mapping(self, output_file: str) -> None:
+        """Save name mapping to file."""
         with open(output_file, 'w') as f:
             f.write("New_Name\tOriginal_Name\tSource_File\n")
-            for new_name, (original_name, source_file) in self.name_mapping.items():
+            for new_name, (original_name, source_file) in self.mapping.items_forward():
                 f.write(f"{new_name}\t{original_name}\t{source_file}\n")
 
-    def load_mapping(self, mapping_file):
-        self.name_mapping.clear()
-        self.reverse_mapping.clear()
+    def load_mapping(self, mapping_file: str) -> None:
+        """Load name mapping from file."""
+        self.mapping.clear()
         
         with open(mapping_file, 'r') as f:
-            next(f)
+            next(f)  # Skip header
             for line in f:
                 parts = line.strip().split('\t')
                 if len(parts) >= 3:
                     new_name, original_name, source_file = parts[:3]
-                    self.name_mapping[new_name]         = (original_name, source_file)
-                    self.reverse_mapping[original_name] = (new_name, source_file)
+                    self.mapping.add(new_name, original_name, source_file)
 
     def revert_fasta_file(self, renamed_file, output_file):
         with open(output_file, 'w') as out_handle:
-            for record in SeqIO.parse(renamed_file, "fasta"):
-                new_name      = record.id
-                original_name = self.get_original_name(new_name)
-                
-                if original_name:
-                    record.id = original_name
-                else:
-                    pass
-                SeqIO.write(record, out_handle, "fasta")
+            with pysam.FastxFile(str(renamed_file)) as fasta:
+                for entry in fasta:
+                    new_name      = entry.name
+                    original_name = self.get_original_name(new_name)
+                    
+                    if original_name:
+                        out_handle.write(f">{original_name}\n{entry.sequence}\n")
+                    else:
+                        out_handle.write(f">{new_name}\n{entry.sequence}\n")

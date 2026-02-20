@@ -1,5 +1,5 @@
 import os
-from pathlib 				import Path
+from pathlib import Path
 from core.treeutils.newick  import parse, tostring
 from core.treeutils.utils 	import get_front_names, remove_kink
 
@@ -16,7 +16,7 @@ class CutBranches:
 		self.dir_tree         = Path(dir_tree)
 		self.dir_trimmed      = Path(dir_trimmed)
 		self.tree_ending      = tree_ending
-		self.tree_files       = list(Path(os.path.join(self.dir_tree, f)) for f in os.listdir(self.dir_tree) if f.endswith(self.tree_ending))
+		self.tree_files       = list(self.dir_tree / f for f in os.listdir(self.dir_tree) if f.endswith(self.tree_ending))
 		self.min_taxa         = min_taxa
 		self.cutoff           = cutoff
 		self.hcolor           = hcolor
@@ -33,6 +33,9 @@ class CutBranches:
 		self.processed_count = 0
 
 	def run(self):
+		"""
+		Cut branches that have too many tips.
+		"""
 		self.dir_trimmed.mkdir(parents=True, exist_ok=True)
         
 		self.processed_count = 0
@@ -103,7 +106,7 @@ class CutBranches:
 					continue
 
 				if len(subtrees) == 1 and self.count_taxa(subtrees[0]) == num_taxa:
-					output_path = os.path.join(self.dir_trimmed, f"{tree_file.stem}.subtree")
+					output_path = self.dir_trimmed / f"{tree_file.stem}.subtree"
 					with open(tree_file, "r") as infile:
 						with open(output_path, "w") as outfile:
 							outfile.write(infile.read())
@@ -122,7 +125,8 @@ class CutBranches:
 						if subtree.nchildren == 2:
 							_, subtree = remove_kink(subtree, subtree)
 						count += 1
-						output_path = os.path.join(self.dir_trimmed, f"{tree_file.stem}.subtree")
+						# output_path = self.dir_trimmed / f"{tree_file.stem}.subtree"  # whoops..
+						output_path = self.dir_trimmed / f"{tree_file.stem}_{i}.subtree"
 						with open(output_path, "w") as outfile:
 							outfile.write(tostring(subtree)+";\n")
 						file_metrics['subtree_sizes'].append(len(subtree.leaves()))
@@ -137,7 +141,7 @@ class CutBranches:
 					file_metrics['status']                           = 'cut'
 				else:
 					metrics['total_counts']['small_subtrees'] += len(subtrees)
-					output_path = os.path.join(self.dir_trimmed, f"{tree_file.stem}.subtree")
+					output_path = self.dir_trimmed / f"{tree_file.stem}.subtree"
 					with open(tree_file, "r") as infile:
 						with open(output_path, "w") as outfile:
 							outfile.write(infile.read())

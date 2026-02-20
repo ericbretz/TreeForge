@@ -1,198 +1,217 @@
-<p align="center">
-  <img src="https://i.imgur.com/lMrgrJG.png" alt="Treeforge" width="1000">
-</p>
+# TreeForge
 
-**Treeforge** is a pipeline for building phylogenetic trees from genomic data. This tool automates the phylogenomic workflow developed by Yang Y. and S.A. Smith. Treeforge combines several bioinformatics tools to do sequence alignment, clustering, tree building, and refinement. The whole process is automated and runs in steps, so, all you need to enter is a directory of .fasta files containing your genomic or transcriptomic sequences.
-To learn more about the original workflow behind this pipeline, see: https://bitbucket.org/yanglab/phylogenomic_dataset_construction/src/master/
-<p align="right">EC Bretz</p>
+A comprehensive phylogenetic tree construction pipeline for comparative genomics.
 
-> [!CAUTION]
-> $\Huge\textcolor[RGB]{248, 82, 73}{\textsf{TreeForge is currently under development}}$
+## Overview
 
-<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Dependencies</h2>
+TreeForge is an automated pipeline for constructing phylogenetic trees from genomic or transcriptomic data. It integrates multiple bioinformatics tools (BLAST, MCL, MAFFT, IQ-TREE, PRANK, ASTRAL) into a streamlined workflow.
 
-- **MAFFT** - Multiple sequence alignment
-- **MCL** - Markov Clustering for sequence clustering
-- **BLAST+** - Sequence similarity search (`blastn`, `makeblastdb`)
-- **PRANK** - Phylogeny-aware alignment
-- **IQ-TREE2** - Maximum likelihood tree inference (`iqtree2`)
-- **ASTRAL** - Coalescent-based species tree estimation
-- **PHYX** - Phylogenetic tools (`pxcat`, `pxclsq`)
-- **Python** (>=3.7) with:
-  - numpy
-  - pysam
-  - biopython
-  - ete3
-  - pyyaml
+## Features
 
-#### Ubuntu/Debian:
-```bash
-sudo apt-get install mafft mcl ncbi-blast+ prank iqtree phyx
-```
+- **Automated ortholog detection** using BLAST and MCL clustering
+- **Multiple sequence alignment** with MAFFT
+- **Gene tree construction** with IQ-TREE
+- **Tree refinement** through iterative pruning and realignment
+- **Species tree inference** using both coalescent (ASTRAL) and concatenation methods
+- **Hierarchical clustering** support for large datasets
+- **BUSCO-based gene extraction** for high-quality phylogenomics
+- **Configurable parameters** via command-line or YAML files
 
-#### Python dependencies:
+## Installation
+
+### Dependencies
+
+TreeForge requires Python 3.7+ and the following Python packages:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Installation</h2>
+### External Tools
 
-1. Clone the repository:
-```bash
-git clone https://github.com/ericbretz/TreeForge.git
-cd TreeForge
-```
+Install the following bioinformatics tools and ensure they're in your PATH:
 
-2. Install Python dependencies:
-```bash
-pip install -r requirements.txt
-```
+- **BLAST+** (blastn, makeblastdb)
+- **MCL** (mcl)
+- **MAFFT** (mafft)
+- **IQ-TREE** (iqtree2)
+- **PRANK** (prank)
+- **ASTRAL** (astral)
+- **phyx tools** (pxclsq) - for sequence cleaning
+- **vsearch** or **mmseqs2** - for hierarchical clustering
 
-<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Usage</h2>
+## Quick Start
 
 ### Basic Usage
 
 ```bash
-python treeforge.py -d /path/to/fasta/files
+python treeforge.py -d /path/to/fasta_files -i 3 -t 8
 ```
 
-### Command Line Options
+### Common Options
 
-| Option |   Short   | Description | Default |
-|--------|-----------|-------------|---------|
-| **Basic Parameters** | | | |
-| `--input-dir` | `-d` | Directory containing FASTA files | Current directory |
-| `--output-dir` | `-o` | Output directory | Same as input |
-| `--iter` | `-i` | Number of MAFFT/Tree iterations | 5 |
-| `--threads` | `-t` | Number of threads for parallel processing | 2 |
-| `--clutter` | `-c` | Remove intermediate files after completion | False |
-| **BLAST Stage** | | | |
-| `--blast-evalue` | `-be` | BLAST E-value threshold | 10.0 |
-| `--blast-max-targets` | `-bm` | BLAST max target sequences | 1000 |
-| **MCL Stage** | | | |
-| `--mcl-hit-frac-cutoff` | `-hf` | Hit fraction cutoff for MCL clustering | 0.3 |
-| `--mcl-minimum-taxa` | `-mt` | Minimum taxa for MCL clustering | 10 |
-| `--mcl-inflation` | `-mi` | MCL inflation parameter | 1.4 |
-| `--mcl-perfect-identity` | `-mp` | Perfect identity threshold | 100.0 |
-| `--mcl-coverage-threshold` | `-mc` | Coverage threshold for identical sequences | 0.9 |
-| `--mcl-min-seq-length` | `-ml` | Minimum sequence length | 300 |
-| **MAFFT Stage** | | | |
-| `--mafft-maxiter` | `-mm` | MAFFT max iterations | 1000 |
-| `--mafft-pxclsq-threshold` | `-mx` | pxclsq probability threshold (MAFFT) | 0.1 |
-| `--mafft-thread-divisor` | `-md` | Thread division factor | 4 |
-| **Tree Stage** | | | |
-| `--tree-relative-cutoff` | `-tr` | Relative cutoff for trimming tips | 0.2 |
-| `--tree-absolute-cutoff` | `-ta` | Absolute cutoff for trimming tips | 0.3 |
-| `--tree-branch-cutoff` | `-tb` | Branch cutoff for cutting branches | 0.02 |
-| `--tree-mask-paralogs` | `-tm` | Mask paraphyletic tips (y/n) | n |
-| `--tree-outlier-ratio` | `-to` | Ratio threshold for outlier detection | 20.0 |
-| `--tree-max-trim-iterations` | `-ti` | Maximum trimming iterations | 10 |
-| `--tree-min-subtree-taxa` | `-ts` | Minimum taxa for valid subtrees | 4 |
-| `--tree-min-leaves` | `-tl` | Minimum leaves for valid tree | 4 |
-| **Prune Stage** | | | |
-| `--prune-orthocutoff` | `-po` | Ortholog minimum taxa cutoff | 20 |
-| `--prune-relative-cutoff` | `-pr` | Relative tip cutoff for pruning | 0.2 |
-| `--prune-absolute-cutoff` | `-pa` | Absolute tip cutoff for pruning | 0.3 |
-| `--prune-outlier-ratio` | `-por` | Outlier ratio for pruning | 20.0 |
-| `--prune-max-trim-iterations` | `-pmt` | Max trim iterations for pruning | 10 |
-| `--prune-min-tree-leaves` | `-pml` | Min tree leaves for pruning | 3 |
-| **PRANK Stage** | | | |
-| `--prank-seqtype` | `-ps` | Sequence type for PRANK (dna/aa) | aa |
-| `--prank-pxclsq-threshold` | `-pp` | pxclsq probability threshold (PRANK) | 0.3 |
-| `--prank-bootstrap` | `-pb` | IQ-TREE bootstrap replicates | 1000 |
-| **Super Stage** | | | |
-| `--super-bootstrap` | `-sb` | Supermatrix bootstrap replicates | 1000 |
-| `--output-super-matrix` | `-om` | Output supermatrix tree | False |
-| **Configuration** | | | |
-| `--config` | | Path to configuration file | - |
-| `--config-create` | | Create default configuration file | - |
-| `--config-save` | | Save current arguments to config.yaml | - |
-| **Utility** | | | |
-| `--version` | `-v` | Print version | - |
-
-<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Examples</h2>
-
-#### Basic run with default parameters:
 ```bash
-python treeforge.py -d /path/to/sequences
+# Run with custom parameters
+python treeforge.py \\
+  -d input_sequences/ \\
+  -o output_results/ \\
+  -i 5 \\
+  -t 16 \\
+  -mt 10 \\
+  -po 20
+
+# Use a configuration file
+python treeforge.py --config my_config.yaml
+
+# Create a configuration template
+python treeforge.py --config-create my_config.yaml
 ```
 
-#### Specify output directory and supermatrix:
+## Configuration
+
+TreeForge supports configuration via:
+1. Command-line arguments
+2. YAML configuration files
+3. Combination of both (command-line overrides config file)
+
+### Creating a Config File
+
 ```bash
-python treeforge.py -d /path/to/sequences -o /path/to/output --output-super-matrix
+python treeforge.py --config-create my_config.yaml
 ```
 
-#### Typical parameters for DNA sequences:
+Edit the generated file to customize parameters:
+
+```yaml
+blast_evalue: 10.0
+mcl_minimum_taxa: 10
+mafft_maxiter: 1000
+prune_orthocutoff: 20
+# ... more parameters
+```
+
+## Pipeline Stages
+
+1. **BLAST**: All-vs-all sequence comparison
+2. **MCL**: Clustering of homologous sequences
+3. **MAFFT**: Multiple sequence alignment (iterative)
+4. **Tree Building**: Gene tree construction with IQ-TREE
+5. **Pruning**: Ortholog identification and paralog removal
+6. **PRANK**: Codon-aware alignment refinement
+7. **ASTRAL**: Species tree inference from gene trees
+8. **Supermatrix**: Concatenation-based species tree
+
+## Testing
+
+### Run Unit Tests
+
 ```bash
-python treeforge.py -d /path/to/sequences -i 5 -t 8 -hf 0.4 -mt 8 -po 9
+# Test formatters
+python tests/unit/test_formatters.py
+
+# Test constants
+python tests/unit/test_constants.py
 ```
 
-#### Clean Clutter (remove intermediate files):
+### Run Integration Tests
+
 ```bash
-python treeforge.py -d /path/to/sequences -c
+python tests/integration/test_stages.py
 ```
 
-#### Using configuration files:
+### Generate Test Data
+
 ```bash
-# Create a default configuration file
-python treeforge.py --config-create
-
-# Load configuration file
-python treeforge.py --config config.yaml
-
-# Save current arguments to config
-python treeforge.py -d /path/to/sequences -t 8 --config-save
+python tests/generate_test_data.py
 ```
 
-<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Overview</h2>
+### Validation Tests
 
-1. **BLAST** - All-by-all sequence similarity search
-2. **MCL** - Markov Clustering to identify orthologous groups
-3. **Iterative MAFFT/Tree**:
-   - **MAFFT** - Multiple sequence alignment
-   - **Tree** - Phylogenetic tree construction, tip trimming, masking, and refinement
-4. **Prune** - Filter for 1-to-1 orthologs and prune paralogs
-5. **PRANK** - Phylogeny-aware alignment
-6. **ASTRAL** - Coalescent-based species tree estimation
-7. **Supermatrix (optional)** - If `--output-super-matrix` is set, a supermatrix tree is produced
+```bash
+python tests/test_refactoring_equivalence.py
+```
 
-<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Output</h2>
-
-TreeForge creates a `TreeForge/` directory in your output directory (or input directory by default) with the following structure:
+## Project Structure
 
 ```
 TreeForge/
-├── base/                   # Base files and indices
-├── blast/                  # BLAST results
-│   ├── concatenated.fasta
-│   └── raw.blast
-├── mcl/                    # MCL clustering results
-├── iter_0/                 # First iteration results
-│   ├── mafft/              # MAFFT alignments
-│   └── tree/               # Tree files
-├── iter_1/                 # Second iteration results
-│   ├── mafft/
-│   └── tree/
-├── prune/                  # Pruned orthologs
-│   └── 1to1ortho/          # 1-to-1 ortholog trees
-├── prank/                  # PRANK alignments
-├── super/                  # Supertree and supermatrix results
-│   └── concat.tre
-├── gene_trees/             # Gene tree files
-├── logs/                   # Log files
-├── summary.csv             # Metrics summary
-└── SpeciesTree.tre         # Final phylogenetic tree
-└── SuperMatrix.tre         # (if --output-super-matrix)
+├── core/
+│   ├── config/          # Configuration dataclasses
+│   ├── stages/          # Pipeline stage implementations
+│   ├── treeutils/       # Tree manipulation utilities
+│   └── utils/           # Shared utilities
+├── tests/               # Test suite
+│   ├── unit/           # Unit tests
+│   ├── integration/    # Integration tests
+│   └── generate_test_data.py
+├── treeforge.py        # Main entry point
+└── requirements.txt    # Python dependencies
 ```
 
-<h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Output Files</h2>
+## Advanced Features
 
-- **`SpeciesTree.tre`**  - The final phylogenetic tree in Newick format
-- **`SuperMatrix.tre`**  - The supermatrix tree (if `--output-super-matrix` is used)
-- **`cluster_x.tree`**   - Collection of gene trees in the Newick format
-- **`summary.csv`**      - Summary metrics for each pipeline step
-- **`1to1ortho/*.tre`**  - 1-to-1 ortholog trees
+### Hierarchical Clustering
 
-<p align="center">
-  <img src="https://i.imgur.com/v4OAUEE.png" alt="Treeforge Workflow" width="1000">
-</p>
+For large datasets with many taxa:
+
+```bash
+python treeforge.py -d input/ -hc --hcluster-tool vsearch
+```
+
+### Output Supermatrix
+
+Generate concatenated supermatrix alignment:
+
+```bash
+python treeforge.py -d input/ --super-matrix
+```
+
+## Output Files
+
+TreeForge creates the following directory structure:
+
+```
+output_dir/TreeForge/
+├── 01_input/          # Renamed FASTA files
+├── 02_analysis/       # Intermediate analysis files
+│   ├── blast/
+│   ├── mcl/
+│   ├── iterations/
+│   ├── prune/
+│   └── prank/
+├── 03_results/        # Final results
+│   ├── species_trees/
+│   │   ├── SpeciesTree.coalescent.tre
+│   │   ├── SpeciesTree.molecular.tre
+│   │   └── SuperMatrix.tre
+│   └── gene_trees/
+└── 04_metrics/        # Statistics and logs
+    ├── summary.csv
+    └── logs/
+```
+
+## Contributing
+
+TreeForge has been refactored for improved:
+- **Code organization**: Base classes and configuration management
+- **Efficiency**: Optimized path operations and data structures
+- **Maintainability**: Centralized constants and utilities
+- **Testing**: Comprehensive test suite
+
+## Citation
+
+If you use TreeForge in your research, please cite:
+[Citation information to be added]
+
+## License
+
+[License information to be added]
+
+## Contact
+
+For questions or issues, please open an issue on GitHub or contact [contact info].
+
+## Acknowledgments
+
+TreeForge integrates and builds upon many excellent bioinformatics tools.
+We thank the developers of BLAST, MCL, MAFFT, IQ-TREE, PRANK, and ASTRAL.

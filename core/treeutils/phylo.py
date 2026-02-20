@@ -379,7 +379,7 @@ def getMRCATraverseFromPath(path1, curn2):
         for i in range(len(path1)):
             if parent == path1[i]:
                 mrca = parent
-                x = False
+                x    = False
                 break
         parent = parent.parent
     return mrca
