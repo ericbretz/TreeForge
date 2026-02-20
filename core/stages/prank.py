@@ -1,11 +1,12 @@
 import os
 import sys
-import pysam
 import subprocess
 from pathlib                import Path
 from threading              import Lock
 from core.treeutils.newick  import parse
-from core.utils.printout    import PrintOut
+from core.stages.base_stage import BaseStage
+from core.utils.sublogger   import run_stage_subprocess, run_logged_subprocess
+from core.utils.fasta_io    import read_fasta_sequences, write_single_sequence
 from queue                  import Queue, Empty
 from concurrent.futures     import ThreadPoolExecutor, as_completed
 
@@ -15,7 +16,7 @@ Run prank, pxcslq, iqtree2. This will dynamically adjust the number of workers b
 it also reallocates workers after each stage to make things move faster.
 """
 
-class Prank:
+class Prank(BaseStage):
     def __init__(self,
                  dir_ortho1to1,
                  dir_prank,
@@ -27,29 +28,27 @@ class Prank:
                  hc,
                  bc,
                  prank_pxclsq_threshold,
-                 bootstrap_replicates):
+                 bootstrap_replicates,
+                 subprocess_dir=None,
+                 shared_printClass=None):
+        super().__init__(log, hc, bc, threads, subprocess_dir, shared_printClass)
         self.dir_ortho1to1          = Path(dir_ortho1to1)
         self.dir_prank              = Path(dir_prank)
         self.infile_ending          = infile_ending
         self.dna_aa                 = dna_aa
         self.concat_fasta           = concat_fasta
-        self.threads                = threads
-        self.log                    = log
-        self.hc                     = hc
-        self.bc                     = bc
         self.prank_pxclsq_threshold = prank_pxclsq_threshold
         self.bootstrap_replicates   = bootstrap_replicates
-        self.return_dict            = {}
 
         self.prank_workers          = max(1, int(threads * 0.4))
         self.pxclsq_workers         = max(1, int(threads * 0.2))
         self.iqtree_workers         = max(1, int(threads * 0.4))
         self.iqtree_threads_per_job = 2
 
-        self.printClass             = PrintOut(log, hc, bc)
-        self.printout               = self.printClass.printout
-
     def run(self):
+        """
+        Run PRANK.
+        """
         self.write_fasta_from_tree()
         self.process_alignments()
         if os.path.exists('phyx.logfile'):
@@ -57,6 +56,9 @@ class Prank:
         return self.return_dict
 
     def write_fasta_from_tree(self):
+        """
+        Write FASTA from tree.
+        """
         self.printout('metric', 'Writing FASTA from tree')
         seq_mapping = {}
         for tree in self.dir_ortho1to1.glob('*.tre'):
@@ -75,28 +77,27 @@ class Prank:
                         seq_mapping[fasta_id] = (tree.stem, node.name)
         created_files = set()
         
-        with pysam.FastxFile(self.concat_fasta) as fasta:
-            for entry in fasta:
-                if entry.name in seq_mapping:
-                    tree_name, orig_name = seq_mapping[entry.name]
-                    outfile_path         = os.path.join(self.dir_prank, f"{tree_name}.fa")
-                    mode = 'w' if outfile_path not in created_files else 'a'
-                    with open(outfile_path, mode) as outfile:
-                        outfile.write(f">{orig_name}\n{entry.sequence}\n")
-                    if mode == 'w':
-                        created_files.add(outfile_path)
+        sequences = read_fasta_sequences(self.concat_fasta)
+        for fasta_id, sequence in sequences.items():
+            if fasta_id in seq_mapping:
+                tree_name, orig_name = seq_mapping[fasta_id]
+                outfile_path = self.dir_prank / f"{tree_name}.fa"
+                mode = 'w' if str(outfile_path) not in created_files else 'a'
+                write_single_sequence(orig_name, sequence, outfile_path, mode=mode)
+                if mode == 'w':
+                    created_files.add(str(outfile_path))
         
-        self.printout('metric', f'Created {len(created_files)} FASTA files from tree data')
+        self.printout('metric', {'fasta_from_tree': len(created_files)})
 
     def run_prank_single(self, fa_file):
+        """
+        Run PRANK
+        Single Threaded
+        """
         out_base = fa_file.with_suffix('')
-        cmd      = f"prank -d={fa_file} -o={out_base}.aln"
-        prank    = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        cmd = f"prank -d={fa_file} -o={out_base}.aln"
         
-        if prank.returncode != 0:
-            self.printout('error', 'PRANK failed')
-            self.printout('error', prank.stderr.decode('utf-8'))
-            sys.exit(1)
+        run_stage_subprocess(cmd, f'PRANK {fa_file.stem}', self.subprocess_dir, self.printout)
             
         aln_file = Path(f"{out_base}.aln.best.fas")
         new_name = aln_file.with_name(f"{aln_file.stem.replace('.aln.best', '')}.fas")
@@ -104,26 +105,46 @@ class Prank:
         return new_name
 
     def run_pxclsq_single(self, fas_file):
+        """
+        Run PXCLSQ.
+        Single Threaded
+        """
         out_file = fas_file.with_name(f"{fas_file.name}-cln")
-        cmd      = f"pxclsq -s {fas_file} -p {self.prank_pxclsq_threshold} -o {out_file}"
-        pxclsq   = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        cmd = f"pxclsq -s {fas_file} -p {self.prank_pxclsq_threshold} -o {out_file}"
         
-        if pxclsq.returncode != 0:
-            self.printout('error', 'Pxclsq failed')
-            sys.exit(1)
+        run_stage_subprocess(cmd, f'PRANK pxclsq {fas_file.stem}', self.subprocess_dir, self.printout)
         return out_file
 
     def run_iqtree_single(self, cln_file):
-        cmd    = f"iqtree2 -s {cln_file} -nt {self.iqtree_threads_per_job} -bb {self.bootstrap_replicates} -redo -m GTR+G"
-        iqtree = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        """
+        Run IQ-TREE.
+        Single Threaded
+        """
+        if self.bootstrap_replicates >= 1000:
+            cmd = f"iqtree2 -s {cln_file} -nt {self.iqtree_threads_per_job} -bb {self.bootstrap_replicates} -redo -m GTR+G"
+        else:
+            cmd = f"iqtree2 -s {cln_file} -nt {self.iqtree_threads_per_job} -redo -m GTR+G"
         
-        if iqtree.returncode not in [0,2]:
+        try:
+            if self.subprocess_dir:
+                result = run_logged_subprocess(cmd, self.subprocess_dir, f'prank_iqtree_{cln_file.stem}', shell=True, check=False)
+                if result.returncode not in [0, 2]:
+                    raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
+            else:
+                iqtree = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                if iqtree.returncode not in [0, 2]:
+                    raise subprocess.CalledProcessError(iqtree.returncode, cmd, iqtree.stdout, iqtree.stderr)
+        except subprocess.CalledProcessError as e:
             self.printout('error', 'IQ-TREE2 failed')
-            self.printout('error', iqtree.stderr.decode('utf-8'))
+            if e.stderr:
+                self.printout('error', e.stderr.decode('utf-8'))
             sys.exit(1)
         return cln_file.with_suffix('.treefile')
 
     def run_optimized(self, files):
+        """
+        Run PRANK, PXCLSQ, IQ-TREE in parallel.
+        """
         results          = []
         total_files      = len(files)
         completed_prank  = 0
@@ -196,41 +217,49 @@ class Prank:
                 except Empty:
                     break
 
-        with ThreadPoolExecutor(max_workers=self.prank_workers + self.pxclsq_workers + self.iqtree_workers) as executor:
-            prank_futures = [executor.submit(prank_worker) for _ in range(self.prank_workers)]
-            
-            for future in as_completed(prank_futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    self.printout('error', f'Prank worker failed: {e}')
-                    sys.exit(1)
-            
-            for _ in range(self.prank_workers):
-                prank_queue.put(None)
-            
-            pxclsq_futures = [executor.submit(pxclsq_worker) for _ in range(self.pxclsq_workers)]
-            
-            for future in as_completed(pxclsq_futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    self.printout('error', f'Pxclsq worker failed: {e}')
-                    sys.exit(1)
-            
-            iqtree_futures = [executor.submit(iqtree_worker) for _ in range(self.iqtree_workers)]
-            
-            for future in as_completed(iqtree_futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    self.printout('error', f'Iqtree worker failed: {e}')
-                    sys.exit(1)
+        try:
+            with ThreadPoolExecutor(max_workers=self.prank_workers + self.pxclsq_workers + self.iqtree_workers) as executor:
+                prank_futures = [executor.submit(prank_worker) for _ in range(self.prank_workers)]
+                
+                for future in as_completed(prank_futures):
+                    try:
+                        future.result()
+                    except Exception as e:
+                        self.printout('error', f'Prank worker failed: {e}')
+                        sys.exit(1)
+                
+                for _ in range(self.prank_workers):
+                    prank_queue.put(None)
+                
+                pxclsq_futures = [executor.submit(pxclsq_worker) for _ in range(self.pxclsq_workers)]
+                
+                for future in as_completed(pxclsq_futures):
+                    try:
+                        future.result()
+                    except Exception as e:
+                        self.printout('error', f'Pxclsq worker failed: {e}')
+                        sys.exit(1)
+                
+                iqtree_futures = [executor.submit(iqtree_worker) for _ in range(self.iqtree_workers)]
+                
+                for future in as_completed(iqtree_futures):
+                    try:
+                        future.result()
+                    except Exception as e:
+                        self.printout('error', f'Iqtree worker failed: {e}')
+                        sys.exit(1)
+        except KeyboardInterrupt:
+            self.printout('error', 'Process interrupted by user')
+            raise
 
-        self.printout('metric', f'Generated {len(results)} trees')
+        self.printout('metric', {'prank_trees_generated': len(results)})
         return results
 
     def _reallocate_resources_after_prank(self):
+        """
+        Reallocate resources after PRANK.
+        Calculate new PXCLSQ and IQ-TREE workers based on available threads.
+        """
         available_threads   = self.threads - self.prank_workers
         new_pxclsq_workers  = max(1, int(available_threads * 0.6))
         new_iqtree_workers  = max(1, available_threads - new_pxclsq_workers)
