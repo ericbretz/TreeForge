@@ -10,7 +10,6 @@ COLORS = {
 }
 
 def get_random_colors():
-    """Get three random colors, avoiding repetition."""
     colors = list(COLORS.keys())
     if hasattr(get_random_colors, '_previous_color'):
         colors.remove(get_random_colors._previous_color)
@@ -20,18 +19,29 @@ def get_random_colors():
     get_random_colors._previous_color = selected[-1]
     return [COLORS[color] for color in selected]
 
-def draw_box(lines, hcolor):
-    """Draw box around lines with highlight color."""
+def draw_box(lines, hcolor, log_func=None):
     width  = 78
     top    = f'{hcolor}╭{"─" * width}╮\033[0m'
     bottom = f'{hcolor}╰{"─" * width}╯\033[0m'
     print(top)
+    if log_func:
+        log_func(f"+{'-' * width}+")
     for line in lines:
-        print(f'{hcolor}│ \033[0m{line:<{width-1}}{hcolor}│\033[0m')
+        if len(line) > width - 1:
+            line_to_print = '...' + line[-((width - 1) - 3):]
+        else:
+            line_to_print = line
+        output = f'{hcolor}│ \033[0m{line_to_print:<{width-1}}{hcolor}│\033[0m'
+        print(output)
+        if log_func:
+            import re
+            clean_text = re.sub(r'\033\[[0-9;]+m', '', output)
+            log_func(clean_text)
     print(bottom)
+    if log_func:
+        log_func(f"+{'-' * width}+")
 
-def print_logo(version):
-    """Print TreeForge logo with random colors."""
+def print_logo(version, log_func=None):
     version = f'v{version}'
     logo = [
         '              ╭──────────────────╮   ',
@@ -43,29 +53,36 @@ def print_logo(version):
     ]
     
     for line in logo[:-1]:
-        print(line.center(80))
+        centered = line.center(80)
+        print(centered)
+        if log_func:
+            log_func(centered)
     
     outer, inner, title = get_random_colors()
     title_line = f'{outer[0]}   \033[0m{inner[0]}  \033[0m{title[0]}{logo[-1].center(70)}\033[0m{inner[0]}  \033[0m{outer[0]}   \033[0m'
     print(title_line)
+    if log_func:
+        import re
+        clean_text = re.sub(r'\033\[[0-9;]+m', '', title_line)
+        log_func(clean_text)
     return title[1], title[0]
 
-def print_help(hcolor, defaults):
-    """Print help info in formatted box, using defaults from config."""
+def print_help(hcolor, defaults, log_func=None):
     help_lines = [
         'BASIC:',
         f'--input-dir                 -d    DIR     Directory of FASTA files   (./)',
         f'--iter                      -i    INT     Number of iterations       ({defaults["iter"]})',
         f'--threads                   -t    INT     Number of threads          ({defaults["threads"]})',
         f'--clutter                   -c    BOOL    Remove Intermediate Files  ({defaults["clutter"]})',
-        f'--output-dir                -o    DIR     Output directory           ({defaults["output_dir"] or "./"})',
+        f'--output-dir                -o    DIR     Output directory           (./)',
+        f'--subprocess-logs           -sl   BOOL    Save subprocess logs       ({defaults["subprocess_logs"]})',
         '',
         'BLAST:',
         f'--blast-evalue              -be   FLOAT   BLAST E-value threshold    ({defaults["blast_evalue"]})',
         f'--blast-max-targets         -bm   INT     BLAST max target seqs      ({defaults["blast_max_targets"]})',
         '',
         'MCL:',
-        f'--mcl-hit-frac-cutoff       -hf   FLOAT   Hit fraction cutoff        ({defaults["mcl_hit_frac_cutoff"]})',
+        f'--mcl-hit-frac-cutoff       -mf   FLOAT   Hit fraction cutoff        ({defaults["mcl_hit_frac_cutoff"]})',
         f'--mcl-minimum-taxa          -mt   INT     Min taxa for MCL           ({defaults["mcl_minimum_taxa"]})',
         f'--mcl-inflation             -mi   FLOAT   MCL inflation param        ({defaults["mcl_inflation"]})',
         f'--mcl-perfect-identity      -mp   FLOAT   Perfect identity           ({defaults["mcl_perfect_identity"]})',
@@ -81,6 +98,7 @@ def print_help(hcolor, defaults):
         f'--tree-relative-cutoff      -tr   FLOAT   Rel cutoff for trim tips   ({defaults["tree_relative_cutoff"]})',
         f'--tree-absolute-cutoff      -ta   FLOAT   Abs cutoff for trim tips   ({defaults["tree_absolute_cutoff"]})',
         f'--tree-branch-cutoff        -tb   FLOAT   Branch cutoff              ({defaults["tree_branch_cutoff"]})',
+        f'--tree-start-from-prev      -tg   BOOL    Use prev trees as start    ({defaults.get("tree_start_from_prev", False)})',
         f'--tree-mask-paralogs        -tm   STR     Mask paraphyletic tips     ({defaults["tree_mask_paralogs"]})',
         f'--tree-outlier-ratio        -to   FLOAT   Outlier ratio threshold    ({defaults["tree_outlier_ratio"]})',
         f'--tree-max-trim-iterations  -ti   INT     Max trim iterations        ({defaults["tree_max_trim_iterations"]})',
@@ -96,31 +114,38 @@ def print_help(hcolor, defaults):
         f'--prune-min-tree-leaves     -pml  INT     Min tree leaves for prune  ({defaults["prune_min_tree_leaves"]})',
         '',
         'PRANK:',
-        # f'--prank-seqtype/-ps            STR     PRANK seq type            (dna/aa, {defaults["prank_seqtype"]})',
+        # f'--prank-seqtype             -ps   STR     Sequence type              ({defaults["prank_seqtype"]})',
         f'--prank-pxclsq-threshold    -pp   FLOAT   pxclsq prob threshold      ({defaults["prank_pxclsq_threshold"]})',
         f'--prank-bootstrap           -pb   INT     IQ-TREE bootstraps         ({defaults["prank_bootstrap"]})',
         '',
         'SUPER:',
+        f'--super-matrix              -sm   BOOL    Output supermatrix         ({defaults["super_matrix"]})',
         f'--super-bootstrap           -sb   INT     Supermatrix bootstraps     ({defaults["super_bootstrap"]})',
         f'--bes-support               -bs   FLOAT   BES support                ({defaults["bes_support"]})',
+        '',
+        'HCLUSTER:',
+        f'--hcluster-enabled          -hc   BOOL    Hierarchical Clustering    ({defaults["hcluster_enabled"]})',
+        f'--hcluster-id               -hi   FLOAT   Vsearch id                 ({defaults["hcluster_id"]})',
+        f'--hcluster-iddef            -hid  INT     Vsearch iddef              ({defaults["hcluster_iddef"]})',
+        f'--hcluster-tree             -hg   PATH    Custom guide tree path     ({defaults["hcluster_tree"]})',
+        # f'--hcluster-tool             -ht   STR     Clustering tool            ({defaults["hcluster_tool"]})',
+        f'--hcluster-tool             -ht   STR     vsearch or mmseqs2         ()',
+        f'--hcluster-use-busco        -hub  BOOL    Use BUSCO-filtered files   ({defaults["hcluster_use_busco"]})',
+        '',
+        'BUSCO:',
+        f'--busco-evalue              -bce  FLOAT   BUSCO BLAST E-value        ({defaults["busco_evalue"]})',
+        f'--busco-max-targets         -bct  INT     BUSCO BLAST max targets    ({defaults["busco_max_targets"]})',
+        f'--busco-coverage-threshold  -bcc  FLOAT   BUSCO coverage threshold   ({defaults["busco_coverage_threshold"]})',
         '',
         'CONFIG:',
         '--config                          PATH    Path to config file',
         '--config-create [NAME]            BOOL    Create config template',
-        '--config-save [NAME]              BOOL    Save  args to config',
-        '',
-        'OUTPUT:',
-        f'--output-super-matrix       -om   BOOL    Output supermatrix         ({defaults["output_super_matrix"]})',
+        '--config-save [NAME]              BOOL    Save args to config',
     ]
-    draw_box(help_lines, hcolor)
+    draw_box(help_lines, hcolor, log_func)
 
-def print_args(args, hcolor, passed_args):
+def print_args(args, hcolor, passed_args, log_func=None):
     """Print command line args in formatted box."""
-    skip_map = {
-        'b': 'BLAST', 'm': 'MCL', 'a': 'MAFFT', 't': 'Tree',
-        'p': 'Prune', 'r': 'Prank', 's': 'Astral'
-    }
-    
     dir_path = str(os.getcwd())[-30:] if not args.input_dir else ('..' + args.input_dir[-38:] if len(args.input_dir) > 40 else args.input_dir)
     
     arg_mappings = {
@@ -130,6 +155,7 @@ def print_args(args, hcolor, passed_args):
             'threads'                   : [f'Threads:', args.threads],
             'clutter'                   : [f'Clutter:', args.clutter],
             'output_dir'                : [f'Output directory:', args.output_dir if args.output_dir else 'Same as input'],
+            'subprocess_logs'           : [f'Subprocess logs:', args.subprocess_logs],
         },
         'BLAST:': {
             'blast_evalue'              : [f'E-value:', args.blast_evalue],
@@ -152,6 +178,7 @@ def print_args(args, hcolor, passed_args):
             'tree_relative_cutoff'      : [f'Relative cutoff:', args.tree_relative_cutoff],
             'tree_absolute_cutoff'      : [f'Absolute cutoff:', args.tree_absolute_cutoff],
             'tree_branch_cutoff'        : [f'Branch cutoff:', args.tree_branch_cutoff],
+            'tree_start_from_prev'      : [f'Start from previous trees:', args.tree_start_from_prev],
             'tree_mask_paralogs'        : [f'Mask paralogs:', args.tree_mask_paralogs],
             'tree_outlier_ratio'        : [f'Outlier ratio:', args.tree_outlier_ratio],
             'tree_max_trim_iterations'  : [f'Max trim iterations:', args.tree_max_trim_iterations],
@@ -167,12 +194,25 @@ def print_args(args, hcolor, passed_args):
             'prune_min_tree_leaves'     : [f'Min tree leaves:', args.prune_min_tree_leaves],
         },
         'PRANK:': {
-            'prank_seqtype'             : [f'Sequence type:', args.prank_seqtype],
+            # 'prank_seqtype'             : [f'Sequence type:', args.prank_seqtype],
             'prank_pxclsq_threshold'    : [f'pxclsq threshold:', args.prank_pxclsq_threshold],
             'prank_bootstrap'           : [f'Bootstrap replicates:', args.prank_bootstrap],
         },
         'SUPER:': {
             'super_bootstrap'           : [f'Bootstrap replicates:', args.super_bootstrap],
+            'super_matrix'              : [f'Output supermatrix:', args.super_matrix],
+        },
+        'HCLUSTER:': {
+            'hcluster_enabled'          : [f'Hierarchical Clustering:', args.hcluster_enabled],
+            'hcluster_id'               : [f'Vsearch id:', args.hcluster_id],
+            'hcluster_iddef'            : [f'Vsearch iddef:', args.hcluster_iddef],
+            'hcluster_tree'             : [f'Custom guide tree:', args.hcluster_tree],
+            'hcluster_tool'             : [f'Clustering tool:', args.hcluster_tool],
+        },
+        'BUSCO:': {
+            'busco_evalue'              : [f'BUSCO E-value:', args.busco_evalue],
+            'busco_max_targets'         : [f'BUSCO max targets:', args.busco_max_targets],
+            'busco_coverage_threshold'  : [f'BUSCO coverage threshold:', args.busco_coverage_threshold],
         },
     }
     
@@ -183,22 +223,31 @@ def print_args(args, hcolor, passed_args):
         if stage_args:
             args_list.append(stage)
             args_list.extend(stage_args)
-
-    if args.SKIP != '-':
-        skipped_stages = [skip_map[x] for x in args.SKIP]
-        if len(skipped_stages) > 4:
-            mid_point  = (len(skipped_stages) + 1)              // 2
-            first_row  = ', '.join(skipped_stages[:mid_point])
-            second_row = ', '.join(skipped_stages[mid_point:])
-            args_list.append('SKIPPED STAGES:')
-            args_list.append(f'                                 {first_row}')
-            args_list.append(f'                                 {second_row}')
-        else:
-            skipped = ', '.join(skipped_stages)
-            args_list.append('SKIPPED STAGES:')
-            args_list.append(f'                                 {skipped}')
     
-    draw_box(args_list, hcolor)
+    draw_box(args_list, hcolor, log_func)
+
+def print_hcluster_warning(hcolor, log_func=None):
+    warning          = 'WARNING: HIERARCHICAL CLUSTERING MODE'
+    visible_width    = 77
+    warning_centered = warning.center(visible_width)
+    warning_with_bg  = f'\033[41m{warning_centered}\033[0m'
+    red              = '\033[31m'
+    width            = 78
+    
+    lines = [
+        f'{red}╭{"─" * width}╮\033[0m',
+        f'{red}│ \033[0m{warning_with_bg}{red}│\033[0m',
+        f'{red}│ \033[0m{"Hierarchical clustering is still under construction and untested.":<77}{red}│\033[0m',
+        f'{red}│ \033[0m{"Please use this feature with caution and verify results carefully.":<77}{red}│\033[0m',
+        f'{red}╰{"─" * width}╯\033[0m'
+    ]
+    
+    for line in lines:
+        print(line)
+        if log_func:
+            import re
+            clean_text = re.sub(r'\033\[[0-9;]+m', '', line)
+            log_func(clean_text)
 
 if __name__ == "__main__":
     from core.utils.config import Config

@@ -1,4 +1,3 @@
-import sys
 import csv
 from typing import List, Dict, Set, Optional, Tuple, Any
 from pathlib import Path
@@ -124,63 +123,15 @@ class Quartet:
                 (inbp.right == self.left and inbp.left == self.right))
 
     def match(self, inq: 'Quartet') -> bool:
-        if self.conflict(inq):
-            return False
-        lmatchedl, lmatchedr = set(), set()
-        for i in self.lefts:
-            tl = 0
-            for j, l in enumerate(inq.lefts):
-                if i & l:
-                    tl += 1
-                    lmatchedl.add(j)
-            for j, r in enumerate(inq.rights):
-                if i & r:
-                    tl += 1
-                    lmatchedr.add(j)
-            if tl > 1:
-                return False
-        samed = True
-        lmatched = lmatchedl
-        if lmatchedl and lmatchedr:
-            return False
-        if lmatchedr:
-            samed = False
-            lmatched = lmatchedr
-        if len(lmatched) < 2:
-            return False
-        rmatchedl, rmatchedr = set(), set()
-        for i in self.rights:
-            tl = 0
-            for j, l in enumerate(inq.lefts):
-                if i & l:
-                    tl += 1
-                    rmatchedl.add(j)
-            for j, r in enumerate(inq.rights):
-                if i & r:
-                    tl += 1
-                    rmatchedr.add(j)
-            if tl > 1:
-                return False
-        if rmatchedl and rmatchedr:
-            return False
-        rmatched = rmatchedr
-        if samed and rmatchedl:
-            return False
-        if not samed and rmatchedr:
-            return False
-        if not samed:
-            rmatched = rmatchedl
-        if len(rmatched) < 2:
-            return False
-        return True
+        return self.same(inq)
 
 def get_quartet(nd: Node, rt: Node) -> Optional[Quartet]:
     if not nd.children or nd == rt:
         return None
     rights = [set(child.lvsnms()) for child in nd.children]
-    right = set().union(*rights)
-    p = nd.parent
-    lefts = []
+    right  = set().union(*rights)
+    p      = nd.parent
+    lefts  = []
     if p:
         for sib in p.children:
             if set(sib.lvsnms()) & right:
@@ -211,17 +162,17 @@ def build(instr: str) -> Node:
             begining = False
         elif nextchar == "(" and not begining:
             if current_node is None:
-                raise ValueError("Invalid tree structure: current_node is None when encountering '('")
+                raise ValueError("Unexpected '(' - no parent node available")
             newnode = Node()
             current_node.add_child(newnode)
             current_node = newnode
         elif nextchar == ',':
             if current_node is None:
-                raise ValueError("Invalid tree structure: current_node is None when encountering ','")
+                raise ValueError("Unexpected ',' - no parent node available")
             current_node = current_node.parent
         elif nextchar == ")":
             if current_node is None:
-                raise ValueError("Invalid tree structure: current_node is None when encountering ')'")
+                raise ValueError("Unexpected ')' - no parent node available")
             current_node = current_node.parent
             index += 1
             if index < n:
@@ -269,7 +220,7 @@ def build(instr: str) -> Node:
                 raise ValueError("Invalid tree structure: current_node is None when encountering leaf node")
             newnode = Node()
             current_node.add_child(newnode)
-            current_node = newnode
+            current_node       = newnode
             current_node.istip = True
             while nextchar not in ',):;[' and not nextchar.isspace():
                 name += nextchar
@@ -277,11 +228,11 @@ def build(instr: str) -> Node:
                 if index >= n:
                     break
                 nextchar = instr[index]
-            current_node.label = name
-            index -= 1
+            current_node.label  = name
+            index              -= 1
         if index < n - 1:
-            index += 1
-            nextchar = instr[index]
+            index    += 1
+            nextchar  = instr[index]
         name = ""
         branch = ""
     return root
@@ -331,41 +282,53 @@ def prepare_sp_tree(sp_tree: Node) -> Tuple[Dict[Quartet, List[float]], Dict[Qua
     for i in sp_tree.iternodes():
         i.data['q'] = get_quartet(i, sp_tree)
         if i.istip:
-            i.data['qln'] = []
+            i.data['qln']      = []
             i.data['qlntrees'] = set()
         elif i.data['q'] is not None:
             sp_tree_quartets[i.data['q']] = []
-            q_to_n[i.data['q']] = []
+            q_to_n[i.data['q']]           = []
     return sp_tree_quartets, q_to_n
 
 def process_gene_trees(g_tree: List[str], sp_quartet_tree: Dict[Quartet, List[float]], sp_tree: Node, supval: float) -> Tuple[Node, Dict[Quartet, List[float]]]:
+    processed_trees  = 0
+    matched_quartets = 0
+    
     for count, gene in enumerate(g_tree):
-        tree = build(gene.strip())
-        for i in sp_quartet_tree:
-            for j in tree.iternodes():
-                gqu = get_quartet(j, tree)
-                if gqu and i.match(gqu):
-                    if not j.label:
-                        j.label = 0.0
-                    if supval <= float(j.label):
+        try:
+            tree = build(gene.strip())
+            processed_trees += 1
+            
+            for i in sp_quartet_tree:
+                for j in tree.iternodes():
+                    gqu = get_quartet(j, tree)
+                    if gqu and i.match(gqu):
                         sp_quartet_tree[i].append(j.length)
-                        check = {list(k)[0] for k in gqu.lefts + gqu.rights if len(k) == 1}
-                        keep = {list(k)[0] for k in i.lefts + i.rights if len(k) == 1 and list(k)[0] in check}
+                        matched_quartets += 1
+                        check             = {list(k)[0] for k in gqu.lefts + gqu.rights if len(k) == 1}
+                        keep              = {list(k)[0] for k in i.lefts + i.rights if len(k) == 1 and list(k)[0] in check}
                         for k in keep:
                             ln = tree.get_tip(k).length
                             st = sp_tree.get_tip(k)
                             if tree not in st.data["qlntrees"]:
                                 st.data["qlntrees"].add(tree)
                                 st.data["qln"].append(ln)
+        except Exception as e:
+            continue
+    
     return sp_tree, sp_quartet_tree
 
 def summarizer(sp_tree: Node, sp_quartet_tree: Dict[Quartet, List[float]], output_dir: Optional[str]) -> None:
     output_dir     = Path(output_dir)
+    
+    bes_trees_dir = output_dir / "BES_Trees"
+    bes_trees_dir.mkdir(exist_ok=True)
+    
     molecular_path = output_dir / "SpeciesTree.molecular.tre"
     verbose_path   = output_dir / "SpeciesTree.verbose.csv"
     v_out          = open(verbose_path, "w", newline='')
     outf           = open(molecular_path, "w")
     v_writer       = csv.writer(v_out) if v_out else None
+    
     for i in sp_tree.iternodes(): 
         if i == sp_tree:
             continue
@@ -392,21 +355,73 @@ def summarizer(sp_tree: Node, sp_quartet_tree: Dict[Quartet, List[float]], outpu
         i.data["max"]    = max_
         i.data["cih"]    = CIH
         i.data["cil"]    = CIL
-    array = ["mean", "median", "min", "max", "cil", "cih", "concord"]
-    for stat in array:
-        outstr = sp_tree.get_newick_otherlen(stat) + ";"
-        if outf:
-            outf.write(outstr + "\n")
+    
+    stat_names = ["mean", "median", "min", "max", "cil", "cih", "concord"]
+    for stat in stat_names:
+        tree_string = sp_tree.get_newick_otherlen(stat) + ";"
+        stat_file = bes_trees_dir / f"SpeciesTree.{stat}.tre"
+        with open(stat_file, "w") as f:
+            f.write(tree_string + "\n")
+    
+    molecular_tree = sp_tree.get_newick_otherlen("mean") + ";"
+    if outf:
+        outf.write(molecular_tree + "\n")
+    
     if v_out:
         v_out.close()
     if outf:
         outf.close()
 
+def validate_tree_structure(node: Node, visited: Optional[Set[int]] = None, depth: int = 0, max_depth: int = 10000) -> Tuple[bool, str, int]:
+    if visited is None:
+        visited = set()
+    
+    node_id = id(node)
+    if node_id in visited:
+        return False, f"Circular reference detected at depth {depth}", depth
+    
+    if depth > max_depth:
+        return False, f"Tree depth exceeds maximum ({max_depth})", depth
+    
+    visited.add(node_id)
+    
+    max_child_depth = depth
+    for child in node.children:
+        is_valid, error_msg, child_depth = validate_tree_structure(child, visited.copy(), depth + 1, max_depth)
+        if not is_valid:
+            return False, error_msg, child_depth
+        max_child_depth = max(max_child_depth, child_depth)
+    
+    return True, "", max_child_depth
+
+def get_tree_stats(node: Node) -> Dict[str, Any]:
+    """Get statistics about a tree structure."""
+    try:
+        leaves_count   = len(list(node.leaves()))
+        internal_nodes = sum(1 for n in node.iternodes() if not n.istip)
+        total_nodes    = sum(1 for _ in node.iternodes())
+        max_depth      = 0
+        stack          = [(node, 0)]
+        while stack:
+            current, depth = stack.pop()
+            max_depth = max(max_depth, depth)
+            for child in current.children:
+                stack.append((child, depth + 1))
+        
+        return {
+            'leaves'        : leaves_count,
+            'internal_nodes': internal_nodes,
+            'total_nodes'   : total_nodes,
+            'max_depth'     : max_depth
+        }
+    except Exception as e:
+        return {'error': str(e)}
+
 class BES:
     def __init__(self, printout=None):
         self.printout = printout
 
-    def run(self, species_tree_file, gene_trees_file, support, output_prefix):
+    def run(self, species_tree_file, gene_trees_file, output_prefix):
         try:
             with open(species_tree_file, 'r') as f:
                 species_tree_str = f.read().strip()
@@ -414,22 +429,61 @@ class BES:
             with open(gene_trees_file, 'r') as f:
                 gene_trees = [line.strip() for line in f if line.strip()]
             
-            sp_tree                  = build(species_tree_str)
-            sp_quartet_tree, q_to_n  = prepare_sp_tree(sp_tree)
-            sp_tree, sp_quartet_tree = process_gene_trees(gene_trees, sp_quartet_tree, sp_tree, support)
+            sp_tree = build(species_tree_str)
+            
+            is_valid, error_msg, depth = validate_tree_structure(sp_tree)
+            if not is_valid:
+                if self.printout:
+                    self.printout('error', f'Invalid species tree structure: {error_msg}')
+                return False
+            
+            sp_quartet_tree, q_to_n = prepare_sp_tree(sp_tree)
+            sp_tree, sp_quartet_tree = self._process_gene_trees(gene_trees, sp_quartet_tree, sp_tree)
             summarizer(sp_tree, sp_quartet_tree, output_prefix)
+            
+        except RecursionError:
+            if self.printout:
+                self.printout('error', 'Recursion depth exceeded in BES')
+                self.printout('error', 'Tree may have circular references or excessive depth')
+            return False
         except Exception as e:
             if self.printout:
                 self.printout('error', f'BES pipeline error: {e}')
             else:
-                print(f'BES pipeline error: {e}')
+                msg = f'BES pipeline error: {e}'
+                print(msg if len(msg) <= 80 else '...' + msg[-77:])
             return False
         return True
-
-# if __name__ == "__main__":
-#     bes = BES()
-#     species_tree_str = '/home/eric/02_Tests/joeTest_4/TreeForge/SpeciesTree.tre'
-#     gene_trees       = '/home/eric/02_Tests/joeTest_4/TreeForge/super/concat.tre'
-#     support          = 0.0
-#     output_prefix    = '/home/eric/02_Tests/besTest/output3'
-#     bes.run(species_tree_str, gene_trees, support, output_prefix)
+    
+    def _process_gene_trees(self, g_tree: List[str], 
+                           sp_quartet_tree: Dict[Quartet, List[float]], 
+                           sp_tree: Node) -> Tuple[Node, Dict[Quartet, List[float]]]:
+        """Process gene trees and match quartets."""
+        processed_trees = 0
+        
+        for count, gene in enumerate(g_tree):
+            try:
+                tree = build(gene.strip())
+                processed_trees += 1
+                
+                for i in sp_quartet_tree:
+                    for j in tree.iternodes():
+                        gqu = get_quartet(j, tree)
+                        if gqu and i.match(gqu):
+                            sp_quartet_tree[i].append(j.length)
+                            check = {list(k)[0] for k in gqu.lefts + gqu.rights if len(k) == 1}
+                            keep  = {list(k)[0] for k in i.lefts + i.rights if len(k) == 1 and list(k)[0] in check}
+                            for k in keep:
+                                ln = tree.get_tip(k).length
+                                st = sp_tree.get_tip(k)
+                                if tree not in st.data["qlntrees"]:
+                                    st.data["qlntrees"].add(tree)
+                                    st.data["qln"].append(ln)
+            except RecursionError:
+                if self.printout:
+                    self.printout('error', f'Recursion error at gene tree {count}')
+                raise
+            except Exception:
+                continue
+        
+        return sp_tree, sp_quartet_tree

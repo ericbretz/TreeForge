@@ -1,22 +1,22 @@
 import sys
-import pysam
 import subprocess
-from core.utils.printout import PrintOut
+from pathlib import Path
+from core.stages.base_stage import BaseStage
+from core.utils.sublogger import run_stage_subprocess
+from core.utils.fasta_io import concatenate_fasta_files
 
-class Blast:
-    def __init__(self, dir_base, dir_treeforge, files_fasta, files_concatenated, files_raw_blast, threads, log, hc, bc, blast_evalue, blast_max_targets):
-        self.dir_base           = dir_base
-        self.dir_treeforge      = dir_treeforge
+class Blast(BaseStage):
+    def __init__(self, dir_base, dir_treeforge, files_fasta, files_concatenated, files_raw_blast, threads, log, hc, bc, blast_evalue, blast_max_targets, subprocess_dir=None, shared_printClass=None):
+        super().__init__(log, hc, bc, threads, subprocess_dir, shared_printClass)
+        self.dir_base           = Path(dir_base)
+        self.dir_treeforge      = Path(dir_treeforge)
         self.files_fasta        = files_fasta
         self.files_concatenated = files_concatenated
         self.files_raw_blast    = files_raw_blast
-        self.threads            = threads
         self.blast_evalue       = blast_evalue
         self.blast_max_targets  = blast_max_targets
         self.contig_count       = 0
         self.return_dict        = {'contig_count': self.contig_count}
-        self.printClass         = PrintOut(log, hc, bc)
-        self.printout           = self.printClass.printout
 
     def run(self):
         self.fasta_concatenation()
@@ -29,17 +29,8 @@ class Blast:
         Concatenate all FASTA files into one file.
         '''
         self.printout('metric', 'FASTA Concatenation')
-        lines = []
-        for fasta in self.files_fasta:
-            fasta = pysam.FastaFile(fasta)
-            reference = fasta.references
-            for _, name in enumerate(reference):
-                seq = fasta.fetch(name)
-                lines.append(f">{name}\n{seq}")
-                self.contig_count += 1
+        self.contig_count = concatenate_fasta_files(self.files_fasta, self.files_concatenated)
         self.return_dict['contig_count'] = self.contig_count
-        with open(self.files_concatenated, 'w') as f:
-            f.write("\n".join(lines))
         return
     
     def make_blast_db(self):
@@ -47,24 +38,15 @@ class Blast:
         Build BLAST database from concatenated FASTA.
         '''
         self.printout('metric', 'Build Database')
-        cmd   = f'makeblastdb -in {self.files_concatenated} -parse_seqids -dbtype nucl -out {self.files_concatenated}'
-        blast = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
-        if blast.returncode != 0:
-            self.printout('error', 'BLAST makeblastdb failed')
-            self.printout('error', blast.stderr.decode('utf-8'))
-            sys.exit(1)
-        else:
-            return
+        cmd = f'makeblastdb -in {self.files_concatenated} -parse_seqids -dbtype nucl -out {self.files_concatenated}'
+        run_stage_subprocess(cmd, 'BLAST makeblastdb', self.subprocess_dir, self.printout)
+        return
         
     def all_by_all(self):
         '''
         Run BLAST all-by-all search.
         '''
         self.printout('metric', 'All-by-All Comparison')
-        cmd   = f'blastn -db {self.files_concatenated} -query {self.files_concatenated} -evalue {self.blast_evalue} -num_threads {self.threads} -max_target_seqs {self.blast_max_targets} -out {self.files_raw_blast} -outfmt "6 qseqid qlen sseqid slen frames pident nident length mismatch gapopen qstart qend sstart send evalue bitscore"'
-        blast = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        if blast.returncode != 0:
-            self.printout('error', 'BLAST blastn failed')
-            sys.exit(1)
-        else:
-            return
+        cmd = f'blastn -db {self.files_concatenated} -query {self.files_concatenated} -evalue {self.blast_evalue} -num_threads {self.threads} -max_target_seqs {self.blast_max_targets} -out {self.files_raw_blast} -outfmt "6 qseqid qlen sseqid slen frames pident nident length mismatch gapopen qstart qend sstart send evalue bitscore"'
+        run_stage_subprocess(cmd, 'BLAST blastn', self.subprocess_dir, self.printout)
+        return

@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
 
-"""If the --clutter flag is passed, this is going to try and delete files on the fly. So that a massive tree's intermediate files don't take up too much space.
+"""If the --clutter flag is passed, this is going to try and delete files on the fly. 
+So that a massive tree's intermediate files don't take up too much space.
 Convoluted? Yes. Works? Sometimes."""
 
 def cleanup_files(master_dict, current_iter, stage, clutter, printout, hit_frac_cutoff=None, mcl_inflation=None, cleanup_type='intermediate'):
@@ -100,16 +101,13 @@ def has_files_to_cleanup(dir_path, patterns):
     return False
 
 def remove_files_by_patterns(dir_path, patterns, cleanup_type, printout):
-    # file_type = "intermediate" if cleanup_type == "intermediate" else "preserved"
     for pattern in patterns:
         for file_path in dir_path.glob(pattern):
             if file_path.exists():
                 try:
                     file_path.unlink()
-                    # printout('metric', f'Removed {file_type} file: {file_path.name}')
                 except OSError as e:
                     pass
-                    # printout('error', f'Failed to remove {file_path.name}: {e}')
 
 def remove_empty_dirs(root_dir, protected_dirs, printout):
     if protected_dirs is None:
@@ -121,31 +119,26 @@ def remove_empty_dirs(root_dir, protected_dirs, printout):
         if not any(dirpath.iterdir()):
             try:
                 dirpath.rmdir()
-                # if printout:
-                    # printout('metric', f'Removed empty directory: {dirpath}')
             except OSError as e:
-                # if printout:
                     pass
-                    # printout('error', f'Failed to remove directory {dirpath}: {e}')
 
 def final_cleanup(root_dir, logs_dir, printout, protected_files, protected_dirs, protected_exts):
     if protected_files is None:
         protected_files = {
             'SpeciesTree.tre',
             'FinalTree.tre',
-            'summary.csv',
+            'run_metrics.json',
             'SuperMatrix.tre',
             'SpeciesTree.coalescent.tre',
             'SpeciesTree.molecular.tre'
         }
     if protected_dirs is None:
-        protected_dirs  = {'logs', 'gene_trees'}
+        protected_dirs  = {'logs', 'gene_trees', 'hcluster'}
     if protected_exts is None:
-        protected_exts  = {'.csv', '.yaml'}
+        protected_exts  = {'.yaml'}
     if not root_dir.exists():
         return
     if printout:
-        # printout('metric', 'Performing targeted final cleanup')
         pass
     for item in root_dir.rglob('*'):
         if item.is_file() and item.name == 'phyx.logfile':
@@ -174,11 +167,9 @@ def final_cleanup(root_dir, logs_dir, printout, protected_files, protected_dirs,
             try:
                 item.unlink()
                 if printout:
-                    # printout('metric', f'Removed file: {item}')
                     pass
             except OSError as e:
                 if printout:
-                    # printout('error', f'Failed to remove {item}: {e}')
                     pass
     remove_empty_dirs(root_dir, protected_dirs=protected_dirs, printout=printout)
     for protected_dir in protected_dirs:
@@ -186,8 +177,4 @@ def final_cleanup(root_dir, logs_dir, printout, protected_files, protected_dirs,
         if not protected_path.exists():
             protected_path.mkdir(parents=True, exist_ok=True)
             if printout:
-                # printout('metric', f'Created protected directory: {protected_dir}')
                 pass
-    if printout:
-        # printout('metric', 'Final cleanup complete')
-        pass
