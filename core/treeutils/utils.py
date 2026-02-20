@@ -23,7 +23,7 @@ def get_front_labels(node: Node) -> List[str]:
 
 @lru_cache(maxsize=128)
 def get_back_labels(node: Node, root: Node) -> Set[str]:
-	all_labels = set(get_front_labels(root))
+	all_labels   = set(get_front_labels(root))
 	front_labels = set(get_front_labels(node))
 	return all_labels - front_labels
 	
@@ -67,7 +67,7 @@ def pass_boot_filter(node: Node, min_ave_boot: float) -> bool:
 	if count == 0:
 		return True
 	boot_average = total / float(count)
-	print(boot_average)
+	# print(boot_average)
 	return boot_average >= float(min_ave_boot)
 
 def get_ortho_from_rooted_inclade(inclade: Node) -> List[Node]:

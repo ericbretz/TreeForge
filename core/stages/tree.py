@@ -1,14 +1,15 @@
 import os
 import pysam
 import shutil
+from pathlib                    import Path
 from core.treeutils.trimtips    import TrimTips
 from core.treeutils.masktips    import MaskTips
 from core.treeutils.cutbranches import CutBranches
 from core.treeutils.utils       import get_clusterID, get_front_labels
 from core.treeutils.newick      import parse
-from core.utils.printout        import PrintOut
+from core.stages.base_stage     import BaseStage
 
-class Tree:
+class Tree(BaseStage):
     def __init__(self,
                  dir_base,
                  dir_treeforge,
@@ -32,22 +33,20 @@ class Tree:
                  max_trim_iterations,
                  min_subtree_taxa,
                  min_tree_leaves,
-                 clutter=False):
+                 clutter=False,
+                 shared_printClass=None):
         
-        self.dir_base            = dir_base
-        self.dir_treeforge       = dir_treeforge
-        self.dir_tree            = dir_tree
-        self.dir_mafft           = dir_mafft
-        self.dir_trimmed         = dir_trimmed
-        self.dir_prune           = dir_prune
+        super().__init__(log, hc, bc, threads, shared_printClass=shared_printClass)
+        self.dir_base            = Path(dir_base)
+        self.dir_treeforge       = Path(dir_treeforge)
+        self.dir_tree            = Path(dir_tree)
+        self.dir_mafft           = Path(dir_mafft)
+        self.dir_trimmed         = Path(dir_trimmed)
+        self.dir_prune           = Path(dir_prune)
         self.iter_total          = iter_total
         self.iter_current        = iter_current
         self.minimum_taxa        = minimum_taxa
         self.concatenated_fasta  = concatenated_fasta
-        self.threads             = threads
-        self.log                 = log
-        self.hc                  = hc
-        self.bc                  = bc
 
         self.tree_ending         = '.treefile'          # Tree ending
         self.relative_cutoff     = relative_cutoff      # Relative cutoff
@@ -61,14 +60,25 @@ class Tree:
         self.min_tree_leaves     = min_tree_leaves      # Minimum leaves for valid tree
 
         self.clutter             = clutter              # Clutter flag
-        self.printClass          = PrintOut(log, hc, bc)
-        self.printout            = self.printClass.printout
-        self.return_dict         = {}
         
         self.modified_files      = set()
         self.final_files         = []
         
+        self._seq_dict_cache     = None
+        self._seq_dict_alt_cache = None
+        
+    def _get_base_cluster_id(self, cluster_id):
+        """Extract the base cluster ID from a potentially numbered cluster ID."""
+        if '_' in cluster_id and cluster_id.split('_')[-1].isdigit():
+            parts = cluster_id.split('_')
+            if len(parts) > 1 and parts[-1].isdigit():
+                return '_'.join(parts[:-1])
+        return cluster_id
+        
     def run(self):
+        """
+        Run the Tree stage.
+        """
         self.trim_tips()
         self.mask_tips()
         self.cut_branches()
@@ -76,7 +86,9 @@ class Tree:
         return self.return_dict
 
     def trim_tips(self):
-        """Remove outlier sequences from phylogenetic trees by trimming tips that fall outside our relative and absolute cutoff thresholds."""
+        """
+        Trim tips that are too long or too short
+        """
         self.printout('metric', 'Trimming tips')
         trim_tips = TrimTips(self.dir_tree,
                              self.dir_mafft,
@@ -99,7 +111,9 @@ class Tree:
                     self.modified_files.add(cluster_id)
 
     def mask_tips(self):
-        """Mask tips that are not in the tree."""
+        """
+        Mask tips that are paraphyletic.
+        """
         self.printout('metric', 'Masking tips')
         mask_tips = MaskTips(self.dir_tree,
                              self.dir_mafft,
@@ -118,7 +132,9 @@ class Tree:
                     self.modified_files.add(cluster_id)
 
     def cut_branches(self):
-        """Remove branches that are too short or too long."""
+        """
+        Cut branches that have too many tips.
+        """
         self.printout('metric', 'Cutting branches')
         cut_branches = CutBranches(self.dir_tree,
                                    self.dir_trimmed,
@@ -137,29 +153,35 @@ class Tree:
                     cluster_id = get_clusterID(file_detail['filename'])
                     self.modified_files.add(cluster_id)
 
+    def _load_sequence_cache(self):
+
+        if self._seq_dict_cache is None:
+            self._seq_dict_cache = {}
+            self._seq_dict_alt_cache = {}
+            with pysam.FastxFile(self.concatenated_fasta) as f:
+                for entry in f:
+                    self._seq_dict_cache[entry.name] = entry.sequence
+                    self._seq_dict_alt_cache[entry.name.replace('@', '_')] = entry.sequence
+        
+        return self._seq_dict_cache, self._seq_dict_alt_cache
+    
     def write_tree(self, clutter=None):
-        """Write trees to file."""
         if clutter is None:
             clutter = self.clutter
         self.printout('metric', 'Writing trees')
         current_iter_dir = self.dir_trimmed
         
         if self.iter_current == self.iter_total - 1 or len(self.modified_files) == 0:
-            self.printout('info', f'No files modified in iteration {int(self.iter_current) + 1}')
+            # self.printout('info', f'No files modified in iteration {int(self.iter_current) + 1}')
             self.move_to_prune_stage(clutter=clutter)
             return
         else:
             next_iter = self.iter_current + 1
-            out_dir   = os.path.join(self.dir_treeforge, f'iter_{next_iter}', 'mafft')
+            out_dir   = self.dir_treeforge / '02_analysis' / 'iterations' / f'iter_{next_iter}' / 'mafft'
 
-        os.makedirs(out_dir, exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
         
-        seq_dict = {}
-        seq_dict_alt = {}
-        with pysam.FastxFile(self.concatenated_fasta) as f:
-            for entry in f:
-                seq_dict[entry.name] = entry.sequence
-                seq_dict_alt[entry.name.replace('@', '_')] = entry.sequence
+        seq_dict, seq_dict_alt = self._load_sequence_cache()
 
         written_files   = []
         subtree_files   = [f for f in os.listdir(current_iter_dir) if f.endswith('.subtree')]
@@ -169,11 +191,12 @@ class Tree:
         
         for filename in subtree_files:
             cluster_id = get_clusterID(filename)
+            base_cluster_id = self._get_base_cluster_id(cluster_id)
             
-            if cluster_id in self.modified_files:
-                with open(os.path.join(current_iter_dir, filename), "r") as infile:
+            if base_cluster_id in self.modified_files:
+                with open(Path(current_iter_dir) / filename, "r") as infile:
                     intree = parse(infile.readline())
-                outname           = os.path.join(out_dir, f"{cluster_id}.fa")
+                outname = str(out_dir / f"{cluster_id}.fa")
                 labels            = get_front_labels(intree)
                 sequences_written = 0
                 with open(outname, "w") as outfile:
@@ -189,7 +212,7 @@ class Tree:
                     total_sequences += sequences_written
                     files_written   += 1
             else:
-                self.final_files.append(os.path.join(current_iter_dir, filename))
+                self.final_files.append(str(Path(current_iter_dir) / filename))
                 files_skipped += 1
         
         if self.final_files:
@@ -208,7 +231,6 @@ class Tree:
         self.return_dict['write_tree'] = metric
 
     def move_to_prune_stage(self, clutter=None):
-        """Move all remaining files to the prune stage and remove iteration directories if clutter is set."""
         if clutter is None:
             clutter = self.clutter
         current_iter_dir = self.dir_trimmed
@@ -217,16 +239,18 @@ class Tree:
         self.final_files = []
         for filename in subtree_files:
             cluster_id = get_clusterID(filename)
-            if cluster_id not in self.modified_files:
-                self.final_files.append(os.path.join(current_iter_dir, filename))
+            base_cluster_id = self._get_base_cluster_id(cluster_id)
+            
+            if base_cluster_id not in self.modified_files:
+                self.final_files.append(str(Path(current_iter_dir) / filename))
         
-        os.makedirs(self.dir_prune, exist_ok=True)
+        self.dir_prune.mkdir(parents=True, exist_ok=True)
         for file_path in self.final_files:
-            filename  = os.path.basename(file_path)
-            dest_path = os.path.join(self.dir_prune, filename)
+            file_path_obj = Path(file_path)
+            dest_path = self.dir_prune / file_path_obj.name
             shutil.copy2(file_path, dest_path)
         
-        self.printout('metric', f'Moved {len(self.final_files)} unmodified files to prune stage')
+        # self.printout('info', f'Moved {len(self.final_files)} unmodified files to prune stage')
         if 'write_tree' not in self.return_dict:
             self.return_dict['write_tree'] = {}
         self.return_dict['write_tree'].update({
@@ -243,10 +267,11 @@ class Tree:
                 pass
             iteration_dir = os.path.dirname(current_iter_dir)
             try:
+                iter_path = Path(iteration_dir)
                 if all(
-                    not any(os.scandir(os.path.join(iteration_dir, subdir)))
-                    for subdir in os.listdir(iteration_dir)
-                    if os.path.isdir(os.path.join(iteration_dir, subdir))
+                    not any((iter_path / subdir).iterdir())
+                    for subdir in iter_path.iterdir()
+                    if subdir.is_dir()
                 ):
                     os.rmdir(iteration_dir)
                     self.printout('metric', f'Removed empty iteration directory: {iteration_dir}')

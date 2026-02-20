@@ -22,7 +22,7 @@ class TrimTips:
         self.dir_tree            = Path(dir_tree)
         self.dir_mafft           = Path(dir_mafft)
         self.tree_ending         = tree_ending
-        self.treefile_files      = list(Path(os.path.join(self.dir_mafft, f)) for f in os.listdir(self.dir_mafft) if f.endswith(self.tree_ending))
+        self.treefile_files      = list(self.dir_mafft / f for f in os.listdir(self.dir_mafft) if f.endswith(self.tree_ending))
         self.relative_cutoff     = relative_cutoff
         self.absolute_cutoff     = absolute_cutoff
         self.contig_dct          = contig_dct
@@ -32,15 +32,30 @@ class TrimTips:
         self.min_tree_leaves     = min_tree_leaves
 
     def check_contrast_outlier(self, node0, node1, above0, above1, relative_cutoff):
+        """
+        Check if a tip is an outlier based on the relative cutoff.
+        If the tip is an outlier, return the tip.
+        If the tip is not an outlier, return None.
+        """
         if node0.is_leaf() and above0 > relative_cutoff:
-            if above1 == 0.0 or above0/above1 > self.outlier_ratio:  # Use parameter instead of hardcoded 20
+            if above1 == 0.0 or above0/above1 > self.outlier_ratio:
                 return node0
         if node1.is_leaf() and above1 > relative_cutoff:
-            if above0 == 0.0 or above1/above0 > self.outlier_ratio:  # Use parameter instead of hardcoded 20
+            if above0 == 0.0 or above1/above0 > self.outlier_ratio:
                 return node1
         return None
 
     def remove_a_tip(self, root, tip_node):
+        """
+        Remove a tip from a tree.
+        If the tip is not a leaf, return the root.
+        If the tip is a leaf, remove the tip from the tree.
+        If the parent of the tip has one child, remove the parent and add the child to the grandparent.
+        If the parent of the tip has no children, remove the parent.
+        Return the root.
+        If the remaining leaves are greater than 3, return the root.
+        If the remaining leaves are less than or equal to 3, return None.
+        """
         if not tip_node.is_leaf():
             return root
 
@@ -52,7 +67,7 @@ class TrimTips:
         if len(parent.children) == 1:
             grandparent = parent.parent
             if grandparent is not None:
-                child = parent.children[0]
+                child         = parent.children[0]
                 child.length += parent.length
                 grandparent.remove_child(parent)
                 grandparent.add_child(child)
@@ -74,6 +89,12 @@ class TrimTips:
         node.add_feature('len', length)
 
     def handle_single_child(self, node):
+        """
+        Handle a node with a single child.
+        If the node has no children, return False.
+        If the node has one child, remove the node and add the child to the parent.
+        Return True if the node was handled, False otherwise.
+        """
         if len(node.children) != 1:
             return False
             
@@ -81,13 +102,21 @@ class TrimTips:
         if parent is None:
             return False
             
-        child = node.children[0]
+        child         = node.children[0]
         child.length += node.length
         parent.remove_child(node)
         parent.add_child(child)
         return True
 
     def trim(self, tree, relative_cutoff, absolute_cutoff):
+        """
+        Trim a tree.
+        If the tree is None, return None.
+        If the tree has two children, remove the kink and return the tree.
+        If the tree has no children, return None.
+        If the tree has one child, remove the node and add the child to the parent.
+        Return the trimmed tree.
+        """
         if tree is None:
             return None
         
@@ -216,23 +245,23 @@ class TrimTips:
                 leaves_before = file_metrics['leaves_before']
                 leaves_after  = file_metrics['leaves_after']
                 
-                tree_name = tree_file.with_suffix('.tt')
+                tree_name     = tree_file.with_suffix('.tt')
                 with open(tree_name, 'w') as outfile:
                     outfile.write(tostring(outtree) + ';\n')
                 
                 metrics['processed_count'] += 1
                 if leaves_before != leaves_after:
-                    file_metrics['status'] = 'processed'
+                    file_metrics['status']   = 'processed'
                     file_metrics['modified'] = True
                 else:
-                    file_metrics['status'] = 'unchanged'
+                    file_metrics['status']   = 'unchanged'
                     file_metrics['modified'] = False
                 metrics['file_details'].append(file_metrics)
 
             except Exception as e:
                 metrics['error_count'] += 1
-                file_metrics['error'] = f'unexpected error: {str(e)}'
-                file_metrics['status'] = 'error'
+                file_metrics['error']   = f'unexpected error: {str(e)}'
+                file_metrics['status']  = 'error'
                 metrics['file_details'].append(file_metrics)
                 continue
         return metrics

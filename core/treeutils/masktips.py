@@ -25,10 +25,10 @@ class MaskTips:
         
         self.dir_tree        = Path(dir_tree)
         self.dir_cln         = Path(dir_cln)
-        self.cln_files       = list(Path(os.path.join(self.dir_cln, f)) for f in os.listdir(self.dir_cln) if f.endswith('.cln'))
+        self.cln_files       = list(self.dir_cln / f for f in os.listdir(self.dir_cln) if f.endswith('.cln'))
         self.para            = para
         self.tree_ending     = tree_ending
-        self.tree_files      = list(Path(os.path.join(self.dir_cln, f)) for f in os.listdir(self.dir_cln) if f.endswith(self.tree_ending))
+        self.tree_files      = list(self.dir_cln / f for f in os.listdir(self.dir_cln) if f.endswith(self.tree_ending))
         self.hcolor          = hcolor
         self.min_tree_leaves = min_tree_leaves
         self.return_dict     = {'tree': {}}
@@ -55,35 +55,35 @@ class MaskTips:
     def run(self):
         metrics = {
             'masking_settings': {
-                'mask_paraphyletic' : self.para.lower() == 'y',
-                'tree_ending'       : self.tree_ending
+                'mask_paraphyletic'         : self.para.lower() == 'y',
+                'tree_ending'               : self.tree_ending
             },
             'file_counts': {
-                'total_cln_files'   : len(self.cln_files),
-                'total_tree_files'  : len(self.tree_files)
+                'total_cln_files'           : len(self.cln_files),
+                'total_tree_files'          : len(self.tree_files)
             },
             'processing_results': {
-                'trees_processed'   : 0,
-                'trees_skipped'     : 0,
-                'clusters_processed': 0,
-                'clusters_skipped'  : 0
+                'trees_processed'           : 0,
+                'trees_skipped'             : 0,
+                'clusters_processed'        : 0,
+                'clusters_skipped'          : 0
             },
             'masking_results': {
-                'monophyletic_tips_masked': 0,
-                'paraphyletic_tips_masked': 0
+                'monophyletic_tips_masked'  : 0,
+                'paraphyletic_tips_masked'  : 0
             },
             'errors': {
-                'file_read_errors'     : 0,
-                'tree_parse_errors'    : 0,
-                'invalid_tree_errors'  : 0,
-                'cln_read_errors'      : 0,
-                'duplicate_cluster_ids': 0,
-                'missing_cln_files'    : 0
+                'file_read_errors'          : 0,
+                'tree_parse_errors'         : 0,
+                'invalid_tree_errors'       : 0,
+                'cln_read_errors'           : 0,
+                'duplicate_cluster_ids'     : 0,
+                'missing_cln_files'         : 0
             },
-            'file_details': []
+            'file_details'                  : []
         }
         
-        mask_para = self.para.lower() == 'y'
+        mask_para  = self.para.lower() == 'y'
         file_match = {}
 
         for cf in self.cln_files:
@@ -143,7 +143,7 @@ class MaskTips:
                     metrics['file_details'].append(file_metrics)
                     continue
                 
-            file_metrics['leaves_after'] = len(curroot.leaves())
+            file_metrics['leaves_after']        = len(curroot.leaves())
             file_metrics['monophyletic_masked'] = self.metrics['monophyletic_tips_masked']
             file_metrics['paraphyletic_masked'] = self.metrics['paraphyletic_tips_masked']
             
@@ -294,7 +294,7 @@ class MaskTips:
         return node.prune()
     
     def write_tree(self, curroot, filename):
-        outpath = Path(os.path.join(self.dir_tree, filename))
+        outpath = self.dir_tree / filename
         outfile = outpath.with_suffix('').with_suffix('.mm')
         with open(outfile, "w") as outfile:
             outfile.write(tostring(curroot))

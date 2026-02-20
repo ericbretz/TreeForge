@@ -11,36 +11,30 @@
 import os
 import sys
 import argparse
+import re
 from glob                import glob
 from pathlib             import Path
-from core.utils.logo     import print_logo, print_help, print_args
+from datetime            import datetime
+from core.utils.logo     import print_logo, print_help, print_args, print_hcluster_warning
 from core.datahub        import DataHub
 from core.utils.deps     import Deps
 from core.utils.printout import PrintOut
 from core.utils.config   import ConfigManager
+from core.utils.constants import FASTA_EXTENSIONS
 
-
-'''
-Skip flags:
-b: Skip BLAST
-m: Skip MCL
-a: Skip MAFFT
-t: Skip Tree
-p: Skip Prune
-w: Skip Write
-r: Skip Prank
-s: Skip Astral
-'''
 
 MAJOR = 0
-MINOR = 3
-PATCH = 2
+MINOR = 4
+PATCH = 0
 
 VERSION = f"{MAJOR}.{MINOR}.{PATCH}"
 
 class TreeForge:
     def __init__(self):
-        self.highlight_color, self.background_color = print_logo(VERSION) #looks great on a black terminal, but ubuntu default terminal makes me cry.
+        self.early_log_lines = []
+        self._log_writer = lambda text: self.early_log_lines.append(text)
+        
+        self.highlight_color, self.background_color = print_logo(VERSION, log_func=self._log_writer) #looks great on a black terminal, but ubuntu default terminal makes me cry.
         self.printClass                             = PrintOut('', self.highlight_color, self.background_color)
         self.printout                               = self.printClass.printout
         self.config_manager                         = ConfigManager(self.highlight_color, self.background_color)
@@ -49,10 +43,9 @@ class TreeForge:
         self.original_defaults['config']            = None
         self.original_defaults['config_create']     = False
         self.original_defaults['log']               = 3
+        self.original_defaults['subprocess_logs']   = False
         self.original_defaults['help']              = False
         self.original_defaults['version']           = False
-        self.original_defaults['SAVE']              = False
-        self.original_defaults['SKIP']              = '-'
 
     def parser(self, config_values=None):
         if len(sys.argv) == 1:
@@ -64,10 +57,9 @@ class TreeForge:
         self.defaults_dict['config']          = None
         self.defaults_dict['config_create']   = False
         self.defaults_dict['log']             = 3
+        self.defaults_dict['subprocess_logs'] = False
         self.defaults_dict['help']            = False
         self.defaults_dict['version']         = False
-        self.defaults_dict['SAVE']            = False
-        self.defaults_dict['SKIP']            = '-'
         
         if config_values:
             for key, value in config_values.items():
@@ -108,13 +100,14 @@ class TreeForge:
         parser.add_argument("--threads",                    "-t",   type=int,    help="Number of threads",                          default=self.defaults_dict['threads'])
         parser.add_argument("--clutter",                    "-c",                help="Remove Intermediate Files",                  default=self.defaults_dict['clutter'],                  action="store_true")
         parser.add_argument("--output-dir",                 "-o",   type=str,    help="Output directory",                           default=self.defaults_dict['output_dir'])
+        parser.add_argument("--subprocess-logs",            "-sl",               help="Save subprocess stdout/stderr to log files", default=self.defaults_dict['subprocess_logs'],         action="store_true")
 
         # BLAST
         parser.add_argument("--blast-evalue",               "-be",  type=float,  help="BLAST E-value threshold",                    default=self.defaults_dict['blast_evalue'])
         parser.add_argument("--blast-max-targets",          "-bm",  type=int,    help="BLAST max target sequences",                 default=self.defaults_dict['blast_max_targets'])
         
         # MCL
-        parser.add_argument("--mcl-hit-frac-cutoff",        "-hf",  type=float,  help="Hit fraction cutoff for MCL",                default=self.defaults_dict['mcl_hit_frac_cutoff'])
+        parser.add_argument("--mcl-hit-frac-cutoff",        "-mf",  type=float,  help="Hit fraction cutoff for MCL",                default=self.defaults_dict['mcl_hit_frac_cutoff'])
         parser.add_argument("--mcl-minimum-taxa",           "-mt",  type=int,    help="Minimum taxa for MCL clustering",            default=self.defaults_dict['mcl_minimum_taxa'])
         parser.add_argument("--mcl-inflation",              "-mi",  type=float,  help="MCL inflation parameter",                    default=self.defaults_dict['mcl_inflation'])
         parser.add_argument("--mcl-perfect-identity",       "-mp",  type=float,  help="Perfect identity threshold",                 default=self.defaults_dict['mcl_perfect_identity'])
@@ -127,6 +120,7 @@ class TreeForge:
         parser.add_argument("--mafft-thread-divisor",       "-md",  type=int,    help="Thread division factor",                     default=self.defaults_dict['mafft_thread_divisor'])
         
         # Tree
+        parser.add_argument("--tree-start-from-prev",       "-tg",               help="Reiterative iqtree start tree",              default=self.defaults_dict.get('tree_start_from_prev', False), action="store_true")
         parser.add_argument("--tree-relative-cutoff",       "-tr",  type=float,  help="Relative cutoff for trimming tips",          default=self.defaults_dict['tree_relative_cutoff'])
         parser.add_argument("--tree-absolute-cutoff",       "-ta",  type=float,  help="Absolute cutoff for trimming tips",          default=self.defaults_dict['tree_absolute_cutoff'])
         parser.add_argument("--tree-branch-cutoff",         "-tb",  type=float,  help="Branch cutoff for cutting branches",         default=self.defaults_dict['tree_branch_cutoff'])
@@ -137,7 +131,7 @@ class TreeForge:
         parser.add_argument("--tree-min-leaves",            "-tl",  type=int,    help="Minimum leaves for valid tree",              default=self.defaults_dict['tree_min_leaves']) 
         
         # Prune
-        parser.add_argument("--prune-orthocutoff",          "-po",  type=int,  help="Ortholog Minimum Taxa Cutoff",                 default=self.defaults_dict['prune_orthocutoff'])
+        parser.add_argument("--prune-orthocutoff",          "-po",  type=int,    help="Ortholog Minimum Taxa Cutoff",               default=self.defaults_dict['prune_orthocutoff'])
         parser.add_argument("--prune-relative-cutoff",      "-pr",  type=float,  help="Relative tip cutoff for pruning",            default=self.defaults_dict['prune_relative_cutoff'])
         parser.add_argument("--prune-absolute-cutoff",      "-pa",  type=float,  help="Absolute tip cutoff for pruning",            default=self.defaults_dict['prune_absolute_cutoff'])
         parser.add_argument("--prune-outlier-ratio",        "-por", type=float,  help="Outlier ratio for pruning",                  default=self.defaults_dict['prune_outlier_ratio'])
@@ -145,13 +139,27 @@ class TreeForge:
         parser.add_argument("--prune-min-tree-leaves",      "-pml", type=int,    help="Min tree leaves for pruning",                default=self.defaults_dict['prune_min_tree_leaves'])
         
         # PRANK
-        parser.add_argument("--prank-seqtype",              "-ps",  type=str,   help="Sequence type for PRANK",                     default=self.defaults_dict['prank_seqtype'],            choices=['dna', 'aa'])
+        parser.add_argument("--prank-seqtype",              "-ps",  type=str,   help="Sequence type for PRANK",                     default=self.defaults_dict['prank_seqtype'],            choices=['dna', 'aa']) #maybe some day
         parser.add_argument("--prank-pxclsq-threshold",     "-pp",  type=float, help="pxclsq probability threshold",                default=self.defaults_dict['prank_pxclsq_threshold'])
         parser.add_argument("--prank-bootstrap",            "-pb",  type=int,   help="IQ-TREE bootstrap replicates",                default=self.defaults_dict['prank_bootstrap'])
         
         # Super
         parser.add_argument("--super-bootstrap",            "-sb",  type=int,   help="Supermatrix bootstrap replicates",            default=self.defaults_dict['super_bootstrap'])
         parser.add_argument("--bes-support",                "-bs",  type=float, help="Molecular distance support",                  default=self.defaults_dict['bes_support'])
+        parser.add_argument("--super-matrix",               "-sm",              help="Output supermatrix",                          default=self.defaults_dict['super_matrix'],            action="store_true")
+        
+        # HCluster
+        parser.add_argument("--hcluster-enabled",           "-hc",              help="Run Hierarchical Clustering",                 default=self.defaults_dict['hcluster_enabled'],        action="store_true")
+        parser.add_argument("--hcluster-id",                "-hi",  type=float, help="HCluster id",                                 default=self.defaults_dict['hcluster_id'])
+        parser.add_argument("--hcluster-iddef",             "-hid", type=int,   help="HCluster iddef",                              default=self.defaults_dict['hcluster_iddef'])
+        parser.add_argument("--hcluster-tree",              "-hg",  type=str,   help="Path to custom guide tree",                   default=self.defaults_dict['hcluster_tree'])
+        parser.add_argument("--hcluster-tool",              "-ht",  type=str,   help="Clustering tool (vsearch or mmseqs2)",        default=self.defaults_dict['hcluster_tool'],           choices=['vsearch', 'mmseqs2'])
+        parser.add_argument("--hcluster-use-busco",         "-hub",             help="Use BUSCO-filtered files for clustering",     default=self.defaults_dict['hcluster_use_busco'],      action="store_true")
+        
+        # BUSCO
+        parser.add_argument("--busco-evalue",               "-bce", type=float, help="BUSCO BLAST E-value threshold",               default=self.defaults_dict['busco_evalue'])
+        parser.add_argument("--busco-max-targets",          "-bct", type=int,   help="BUSCO BLAST max target sequences",            default=self.defaults_dict['busco_max_targets'])
+        parser.add_argument("--busco-coverage-threshold",   "-bcc", type=float, help="BUSCO coverage threshold",                    default=self.defaults_dict['busco_coverage_threshold'])
         # Configuration
         parser.add_argument("--config",                             type=str,   help="Path to configuration file",                  default=None,                                           nargs="?", const=True)
         parser.add_argument("--config-create",                      type=str,   help="Create a configuration template",             default=False,                                          nargs="?", const="config.yaml")
@@ -162,22 +170,13 @@ class TreeForge:
         parser.add_argument("--log",                        "-l",   type=int,   help=argparse.SUPPRESS,                             default=self.defaults_dict['log'],                      choices=[0, 1, 2, 3, 4])
         parser.add_argument("--help",                       "-h",               help=argparse.SUPPRESS,                             default=self.defaults_dict['help'],                     action="store_true")
         
-        # DEV
-        parser.add_argument("--SKIP",                               type=str,   help=argparse.SUPPRESS,                             default=self.defaults_dict['SKIP'])
-        parser.add_argument("--SAVE",                                           help=argparse.SUPPRESS,                             default=self.defaults_dict['SAVE'],                     action="store_true")
-        
-        # Output
-        parser.add_argument("--output-super-matrix",       "-om",               help="Output supermatrix",                          default=self.defaults_dict['output_super_matrix'],      action="store_true")
-
         return parser.parse_args()
     
     def _file_exists(self, dir):
-        #['.fasta', '.fa', '.fas', '.fna']
         if os.path.exists(dir):
-            files = glob(os.path.join(dir, '*.fa'))
-            files.extend(glob(os.path.join(dir, '*.fasta')))
-            files.extend(glob(os.path.join(dir, '*.fna')))
-            files.extend(glob(os.path.join(dir, '*.fas')))
+            files = []
+            for ext in FASTA_EXTENSIONS:
+                files.extend(glob(os.path.join(dir, f'*{ext}')))
             if not files:
                 self.printout('error', 'No FASTA files found in directory')
                 sys.exit(1)
@@ -239,7 +238,7 @@ class TreeForge:
             config_path = Path(args.output_dir) / config_filename if args.output_dir else Path(config_filename)
             self.config_manager.save_config(config_dict, config_path)
             out_name = str(config_path.absolute()) if len(str(config_path.absolute())) < 32 else '...' + str(config_path.absolute())[-29:]
-            self.printout('info', f"Current arguments saved to {out_name}")
+            self.printout('info', f"Config saved to {out_name}")
         
         passed_args = {k: v for k, v in args.__dict__.items()
                        if k in self.original_defaults and v != self.original_defaults[k] and v != '-'}
@@ -247,11 +246,23 @@ class TreeForge:
         args.highlight_color  = self.highlight_color
         args.background_color = self.background_color
         
-        print_args(args, args.highlight_color, passed_args)
+        print_args(args, args.highlight_color, passed_args, log_func=self._log_writer)
+        
+        # Print warning if hierarchical clustering is enabled
+        # Still very much under construction and minimally tested
+        if args.hcluster_enabled:
+            print_hcluster_warning(args.highlight_color, log_func=self._log_writer)
+        
         deps = Deps(args.log, args.highlight_color, args.background_color)
         deps.check_deps()
         self._file_exists(args.input_dir)
         dataHub = DataHub(args)
+        
+        if hasattr(dataHub, 'printClass') and hasattr(dataHub.printClass, 'log_handle') and dataHub.printClass.log_handle:
+            for line in self.early_log_lines:
+                dataHub.printClass.log_handle.write(line + '\n')
+            dataHub.printClass.log_handle.flush()
+        
         dataHub.run()
 
 if __name__ == "__main__":
@@ -267,5 +278,9 @@ if __name__ == "__main__":
     #     '-ps', 'aa',
     #     '-l', '3'
     # ]
-    main = TreeForge()
-    main.run()
+    try:
+        main = TreeForge()
+        main.run()
+    except KeyboardInterrupt:
+        print("\n\nProcess interrupted by user.")
+        os._exit(130)
