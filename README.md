@@ -32,21 +32,7 @@ To learn more about the original workflow behind this pipeline, see: https://bit
 
 #### Ubuntu/Debian:
 ```bash
-sudo apt-get install mafft mcl ncbi-blast+ prank iqtree phyx vsearch
-```
-
-#### DIAMOND:
-```bash
-# Download from https://github.com/bbuchfink/diamond/releases
-# or via conda:
-conda install -c bioconda diamond
-```
-
-#### MMseqs2:
-```bash
-# Download from https://github.com/soedinglab/MMseqs2/releases
-# or via conda:
-conda install -c conda-forge -c bioconda mmseqs2
+sudo apt-get install mafft mcl ncbi-blast+ prank iqtree phyx vsearch diamond-aligner mmseqs2
 ```
 
 #### Python dependencies:
