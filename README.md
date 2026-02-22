@@ -6,7 +6,7 @@
 To learn more about the original workflow behind this pipeline, see: https://bitbucket.org/yanglab/phylogenomic_dataset_construction/src/master/
 <p align="right">EC Bretz</p>
 
-[TreeForge Metrics Reference](https://github.com/ericbretz/TreeForge/wiki/TreeForge-Metrics-Reference)
+[TreeForge Metrics Reference](https://github.com/ericbretz/TreeForge/wiki/Metrics-Reference)
 
 > [!CAUTION]
 > $\Huge\textcolor[RGB]{248, 82, 73}{\textsf{TreeForge is currently under development}}$
