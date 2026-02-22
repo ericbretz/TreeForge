@@ -6,6 +6,8 @@
 To learn more about the original workflow behind this pipeline, see: https://bitbucket.org/yanglab/phylogenomic_dataset_construction/src/master/
 <p align="right">EC Bretz</p>
 
+[TreeForge Metrics Reference](https://github.com/ericbretz/TreeForge/wiki/TreeForge-Metrics-Reference)
+
 > [!CAUTION]
 > $\Huge\textcolor[RGB]{248, 82, 73}{\textsf{TreeForge is currently under development}}$
 
@@ -234,7 +236,7 @@ TreeForge/
 │   ├── fai/                     # FASTA index files
 │   └── renamed_fasta/           # Renamed FASTA files
 │
-├── 02_analysis/                 # Core analysis steps (standard pipeline)
+├── 02_analysis/                 # Core analysis steps
 │   ├── blast/                   # BLAST results
 │   │   ├── concatenated.fasta
 │   │   └── raw.blast
@@ -249,7 +251,7 @@ TreeForge/
 │   └── super/                   # Supermatrix analysis
 │       └── concat.tre
 │
-├── 03_results/                  # Final results (MOST IMPORTANT)
+├── 03_results/                  # Final results
 │   ├── species_trees/           # Species trees (standard pipeline)
 │   │   ├── SpeciesTree.coalescent.tre
 │   │   ├── SpeciesTree.molecular.tre
@@ -267,7 +269,7 @@ TreeForge/
     ├── pipeline_summary.csv     # Per-stage summary
     ├── iteration_flow.csv       # Per-iteration statistics
     ├── hcluster_metrics.json    # HCluster metrics (if enabled)
-    └── logs/                    # Log files (per run, timestamped)
+    └── logs/                    # Log files
 ```
 
 <h2><img src="https://i.imgur.com/kEuy7Sd.png" width="20" align="top">&ensp;Output Files</h2>
