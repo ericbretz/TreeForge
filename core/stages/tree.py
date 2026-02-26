@@ -262,7 +262,7 @@ class Tree(BaseStage):
             try:
                 if not any(os.scandir(current_iter_dir)):
                     os.rmdir(current_iter_dir)
-                    self.printout('metric', f'Removed empty directory: {current_iter_dir}')
+                    # self.printout('metric', f'Removed empty directory: {current_iter_dir}')
             except Exception:
                 pass
             iteration_dir = os.path.dirname(current_iter_dir)
@@ -274,6 +274,6 @@ class Tree(BaseStage):
                     if subdir.is_dir()
                 ):
                     os.rmdir(iteration_dir)
-                    self.printout('metric', f'Removed empty iteration directory: {iteration_dir}')
+                    # self.printout('metric', f'Removed empty iteration directory: {iteration_dir}')
             except Exception:
                 pass

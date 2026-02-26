@@ -60,6 +60,7 @@ class ConfigManager:
             'super_matrix'             : False,
             'hcluster_tree'            : '',
             'hcluster_use_busco'       : False,
+            'nocolor'                  : False,
         }
     
     def get_parameter_types(self):
@@ -111,6 +112,7 @@ class ConfigManager:
             'super_matrix'             : 'boolean',
             'hcluster_tree'            : 'string',
             'hcluster_use_busco'       : 'boolean',
+            'nocolor'                  : 'boolean',
         }
     
     def load_config(self, config_path):
@@ -142,6 +144,9 @@ class ConfigManager:
         with open(output_path, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False, indent=2)
     
+    def set_nocolor(self, nocolor: bool) -> None:
+        self.printClass.set_nocolor(nocolor)
+
     def create_config(self, output_path):
         config = {
             **self.get_defaults_dict()

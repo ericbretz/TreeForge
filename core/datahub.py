@@ -27,7 +27,7 @@ from core.utils.contig            import Contig
 from core.utils.constants         import FASTA_EXTENSIONS
 from core.utils.decor             import bilge_crew, tree_crew, convert_paths, _truncate_for_terminal
 from core.utils.printout          import PrintOut
-from core.utils.sublogger import get_subprocess_dir
+from core.utils.sublogger         import get_subprocess_dir
 
 class DataHub:
     def __init__(self, args):
@@ -124,13 +124,14 @@ class DataHub:
         self.dir_treeforge              = self.config.dir_treeforge
         self.files_fasta                = self.config.files_fasta
 
-        # Set up logging and printout before _prior_check (which may exit with messages)
         self.run_timestamp              = datetime.now().strftime('%Y%m%d_%H%M%S')
         dir_logs                        = self.dir_treeforge / '04_metrics' / 'logs'
         log_file_path                   = dir_logs / self.run_timestamp / f"treeforge_{self.run_timestamp}.log"
         log_file_path.parent.mkdir(parents=True, exist_ok=True)
         self.log_file_path              = str(log_file_path)
         self.printClass                 = PrintOut(self.log, args.highlight_color, args.background_color, log_file=self.log_file_path)
+        if getattr(args, 'nocolor', False):
+            self.printClass.set_nocolor(True)
         self.printout                   = self.printClass.printout
         if self.subprocess_logs:
             self.subprocess_dir         = get_subprocess_dir(dir_logs, self.run_timestamp)
@@ -247,7 +248,7 @@ class DataHub:
             'gene_trees'      : {'dir': self.dir_treeforge / '03_results' / 'gene_trees'},
             'hcluster_enabled': {'dir': self.dir_treeforge / '03_results' / 'hcluster'},
             
-            # HCluster-specific BLAST (isolated from normal mode)
+            # HCluster-specific blast
             'hcluster_blast'  : {
                 'dir'  : self.dir_treeforge / '03_results' / 'hcluster' / 'blast',
                 'files': {
@@ -391,6 +392,7 @@ class DataHub:
                 fai_dest = dir_fai / fai.name
                 shutil.move(str(fai), str(fai_dest))
         
+        # please make these logs optional, phyx family
         phyx_log_parent = self.dir_treeforge.parent / 'phyx.logfile'
         if phyx_log_parent.exists():
             phyx_log_parent.unlink()
