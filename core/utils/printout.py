@@ -4,64 +4,41 @@ from typing import Any, Dict, List, Optional
 class PrintOut:
     def __init__(self, level, hc, bc, log_file: Optional[str] = None):
         self.level = level
-        self.hc = hc  # Highlight color
-        self.bc = bc  # Background color
+        self.hc = hc or ''
+        self.bc = bc or ''
+        self.nocolor = False
         self.log_file = log_file
-        
+
         if self.log_file:
             self.log_handle = open(self.log_file, 'w', encoding='utf-8', buffering=1)
         else:
-            self.log_handle = None        
+            self.log_handle = None
         self._last_progress_msg = None
         self._progress_started = False
 
+        self._init_styles()
+
+    def _init_styles(self):
+        _rev   = '\033[7m' if self.nocolor else None
+        c      = _rev if self.nocolor else self.bc
+        info_c = _rev if self.nocolor else '\033[43m'
+        warn_c = _rev if self.nocolor else '\033[48;5;208m'
+        prog_c = _rev if self.nocolor else '\033[47m'
+        err_c  = _rev if self.nocolor else '\033[41m'
+        dbg_c  = _rev if self.nocolor else '\033[44m'
+        succ_c = _rev if self.nocolor else '\033[42m'
+
+        self._reset = '\033[0m'
         self.styles = {
-            'title': {
-                'color'   : self.bc,
-                'width'   : 80,
-                'char'    : ' '
-            },
-            'subtitle': {
-                # 'color'   : '\033[30;47m',
-                'color'   : self.bc,
-                'width'   : 80,
-                'char'    : ' '
-            },
-            'metric': {
-                'color'   : self.bc,
-                'width'   : 80,
-                'char'    : ' '
-            },
-            'info': {
-                'color'   : '\033[43m',
-                'width'   : 80,
-                'char'    : ' '
-            },
-            'warning': {
-                'color'   : '\033[48;5;208m',
-                'width'   : 80,
-                'char'    : ' '
-            },
-            'progress': {
-                'color'   : '\033[47m',
-                'width'   : 80,
-                'char'    : ' '
-            },
-            'error': {
-                'color'   : '\033[41m',
-                'width'   : 80,
-                'char'    : ' '
-            },
-            'debug': {
-                'color'   : '\033[44m',
-                'width'   : 80,
-                'char'    : ' '
-            },
-            'success': {    
-                'color'   : '\033[42m',
-                'width'   : 80,
-                'char'    : ' '
-            },
+            'title':    {'color': c,   'width': 80, 'char': ' '},
+            'subtitle': {'color': c,   'width': 80, 'char': ' '},
+            'metric':   {'color': '\033[107m',   'width': 80, 'char': ' '},
+            'info':     {'color': info_c, 'width': 80, 'char': ' '},
+            'warning':  {'color': warn_c, 'width': 80, 'char': ' '},
+            'progress': {'color': prog_c, 'width': 80, 'char': ' '},
+            'error':    {'color': err_c,  'width': 80, 'char': ' '},
+            'debug':    {'color': dbg_c,  'width': 80, 'char': ' '},
+            'success':  {'color': succ_c, 'width': 80, 'char': ' '},
         }
  
         self.key_translate = {
@@ -316,7 +293,8 @@ class PrintOut:
         width    = self.styles['title']['width']
         char     = self.styles['title']['char']
         string = f'{title:^{width}}'
-        print(f"{color}{string}{'\033[0m'}")
+        # print(f"{color}{string}{'\033[0m'}") #3.12
+        print(str(color) + string + self._reset)
         self._write_to_log(string)
 
     def p_subtitle(self, subtitle: str) -> None:
@@ -324,7 +302,7 @@ class PrintOut:
         width    = self.styles['subtitle']['width']
         char     = self.styles['subtitle']['char']
         string = f'{subtitle:^{width}}'
-        print(f"{color}{string}{'\033[0m'}")
+        print(str(color) + string + self._reset)
         self._write_to_log(string)
 
     def p_metric(self, metric: str) -> None:
@@ -339,11 +317,11 @@ class PrintOut:
                     metric_str = f'{metric_str:<20}│'
                     value_str  = self.fmt_str(str(value), value=True)
                     value_str  = f'{value_str:<{width - 21}}'
-                    output = f"{metric_str}\033[0m {value_str}"
+                    output = f"{metric_str}{self._reset} {value_str}"
                     print(output)
                     self._write_to_log(f"{metric_str} {value_str}")
                 else:
-                    output = f"{color}{str(line):^{width}}\033[0m"
+                    output = f"{color}{str(line):^{width}}{self._reset}"
                     print(output)
                     self._write_to_log(f"{str(line):^{width}}")
         elif isinstance(metric, dict):
@@ -354,12 +332,13 @@ class PrintOut:
                 metric_str = f'{metric_str:<20}│'
                 value_str  = self.fmt_str(str(value), value=True)
                 value_str  = f'{value_str:<{width - 21}}'
-                output = f"{metric_str}\033[0m {value_str}"
+                output = f"{metric_str}{self._reset} {value_str}"
                 print(output)
                 self._write_to_log(f"{metric_str} {value_str}")
         else:
             metric_str = self.fmt_str(self.fmt_key(str(metric)), value=None)
-            output = f"\033[47m{metric_str:^{width}}\033[0m"
+            color = self.styles['metric']['color']
+            output = f"{color}{metric_str:^{width}}{self._reset}"
             print(output)
             self._write_to_log(f"{metric_str:^{width}}")
 
@@ -370,7 +349,7 @@ class PrintOut:
         title    = f'{"INFO":<20}'
         info_str = self.fmt_str(info, value=True)
         string   = f'{info_str:<{width - 21}}'
-        print(f"{color}{title}\033[0m {string}")
+        print(f"{color}{title}{self._reset} {string}")
         self._write_to_log(f"{title} {string}")
 
     def p_warning(self, warning: str) -> None:
@@ -380,7 +359,7 @@ class PrintOut:
         title       = f'{"WARNING":<20}'
         warning_str = self.fmt_str(warning, value=True)
         string      = f'{warning_str:<{width - 21}}'
-        print(f"{color}{title}\033[0m {string}")
+        print(f"{color}{title}{self._reset} {string}")
         self._write_to_log(f"{title} {string}")
 
     def p_error(self, error: str) -> None:
@@ -390,7 +369,7 @@ class PrintOut:
         title     = f'{"ERROR":<20}'
         error_str = self.fmt_str(error, value=True)
         string    = f'{error_str:<{width - 21}}'
-        print(f"{color}{title}\033[0m {string}")
+        print(f"{color}{title}{self._reset} {string}")
         self._write_to_log(f"{title} {string}")
 
     def p_debug(self, debug: str) -> None:
@@ -400,7 +379,7 @@ class PrintOut:
         title     = f'{"DEBUG":<20}'
         debug_str = self.fmt_str(debug, value=True)
         string    = f'{debug_str:<{width - 21}}'
-        print(f"{color}{title}\033[0m {string}")
+        print(f"{color}{title}{self._reset} {string}")
         self._write_to_log(f"{title} {string}")
 
     def p_success(self, success: str) -> None:
@@ -410,13 +389,13 @@ class PrintOut:
         title       = f'{"SUCCESS":<20}'
         success_str = self.fmt_str(success, value=True)
         string      = f'{success_str:<{width - 21}}'
-        print(f"{color}{title}\033[0m {string}")
+        print(f"{color}{title}{self._reset} {string}")
         self._write_to_log(f"{title} {string}")
 
     def p_progress(self, progress: str) -> None:
         color = self.styles['progress']['color']
         width = self.styles['progress']['width']
-        print(f"\033[47m{progress:^{width}}\033[0m", end='\r', flush=True)
+        print(f"{color}{progress:^{width}}{self._reset}", end='\r', flush=True)
         
         if self.log_handle:
             if not self._progress_started:
@@ -426,14 +405,22 @@ class PrintOut:
                 self._progress_started = True
             self._last_progress_msg = progress
 
+    def set_nocolor(self, nocolor: bool) -> None:
+        self.nocolor = nocolor
+        if nocolor:
+            self.hc = ''
+            self.bc = ''
+        self._init_styles()
+
     def p_final(self, files: dict) -> None:
+        r = self._reset
         def draw_box(lines, hcolor):
             width  = 78
-            top    = f'{hcolor}╭{"─" * width}╮\033[0m'
-            bottom = f'{hcolor}╰{"─" * width}╯\033[0m'
+            top    = f'{hcolor}╭{"─" * width}╮{r}'
+            bottom = f'{hcolor}╰{"─" * width}╯{r}'
             print(top)
             for line in lines:
-                print(f'{hcolor}│ \033[0m{line:<{width-1}}{hcolor}│\033[0m')
+                print(f'{hcolor}│ {r}{line:<{width-1}}{hcolor}│{r}')
             print(bottom)
         out_list = []
         for dir, file in files:

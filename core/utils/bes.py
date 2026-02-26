@@ -143,7 +143,7 @@ def get_quartet(nd: Node, rt: Node) -> Optional[Quartet]:
     return Quartet(lefts, rights, nd.length)
 
 def get_quartets(rt: Node) -> List[Quartet]:
-    return [q for i in rt.iternodes() if (q := get_quartet(i, rt)) is not None]
+    return [q for i in rt.iternodes() for q in [get_quartet(i, rt)] if q is not None]
 
 def build(instr: str) -> Node:
     root         = None

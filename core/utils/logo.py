@@ -19,10 +19,11 @@ def get_random_colors():
     get_random_colors._previous_color = selected[-1]
     return [COLORS[color] for color in selected]
 
-def draw_box(lines, hcolor, log_func=None):
+def draw_box(lines, hcolor, log_func=None, nocolor=False):
+    reset = '' if nocolor else '\033[0m'
     width  = 78
-    top    = f'{hcolor}╭{"─" * width}╮\033[0m'
-    bottom = f'{hcolor}╰{"─" * width}╯\033[0m'
+    top    = f'{hcolor}╭{"─" * width}╮{reset}'
+    bottom = f'{hcolor}╰{"─" * width}╯{reset}'
     print(top)
     if log_func:
         log_func(f"+{'-' * width}+")
@@ -31,7 +32,7 @@ def draw_box(lines, hcolor, log_func=None):
             line_to_print = '...' + line[-((width - 1) - 3):]
         else:
             line_to_print = line
-        output = f'{hcolor}│ \033[0m{line_to_print:<{width-1}}{hcolor}│\033[0m'
+        output = f'{hcolor}│ {reset}{line_to_print:<{width-1}}{hcolor}│{reset}'
         print(output)
         if log_func:
             import re
@@ -41,8 +42,9 @@ def draw_box(lines, hcolor, log_func=None):
     if log_func:
         log_func(f"+{'-' * width}+")
 
-def print_logo(version, log_func=None):
+def print_logo(version, log_func=None, nocolor=False):
     version = f'v{version}'
+    reset = '' if nocolor else '\033[0m'
     logo = [
         '              ╭──────────────────╮   ',
         '      ╭───────┴──────╮           │   ',
@@ -58,8 +60,8 @@ def print_logo(version, log_func=None):
         if log_func:
             log_func(centered)
     
-    outer, inner, title = get_random_colors()
-    title_line = f'{outer[0]}   \033[0m{inner[0]}  \033[0m{title[0]}{logo[-1].center(70)}\033[0m{inner[0]}  \033[0m{outer[0]}   \033[0m'
+    outer, inner, title = (('', ''), ('', ''), ('', '')) if nocolor else get_random_colors()
+    title_line = f'{outer[0]}   {reset}{inner[0]}  {reset}{title[0]}{logo[-1].center(70)}{reset}{inner[0]}  {reset}{outer[0]}   {reset}'
     print(title_line)
     if log_func:
         import re
@@ -67,7 +69,7 @@ def print_logo(version, log_func=None):
         log_func(clean_text)
     return title[1], title[0]
 
-def print_help(hcolor, defaults, log_func=None):
+def print_help(hcolor, defaults, log_func=None, nocolor=False):
     help_lines = [
         'BASIC:',
         f'--input-dir                 -d    DIR     Directory of FASTA files   (./)',
@@ -76,6 +78,8 @@ def print_help(hcolor, defaults, log_func=None):
         f'--clutter                   -c    BOOL    Remove Intermediate Files  ({defaults["clutter"]})',
         f'--output-dir                -o    DIR     Output directory           (./)',
         f'--subprocess-logs           -sl   BOOL    Save subprocess logs       ({defaults["subprocess_logs"]})',
+        f'--nocolor                         BOOL    Disable color in terminal',
+
         '',
         'BLAST:',
         f'--blast-evalue              -be   FLOAT   BLAST E-value threshold    ({defaults["blast_evalue"]})',
@@ -142,9 +146,9 @@ def print_help(hcolor, defaults, log_func=None):
         '--config-create [NAME]            BOOL    Create config template',
         '--config-save [NAME]              BOOL    Save args to config',
     ]
-    draw_box(help_lines, hcolor, log_func)
+    draw_box(help_lines, hcolor, log_func, nocolor=nocolor)
 
-def print_args(args, hcolor, passed_args, log_func=None):
+def print_args(args, hcolor, passed_args, log_func=None, nocolor=False):
     """Print command line args in formatted box."""
     dir_path = str(os.getcwd())[-30:] if not args.input_dir else ('..' + args.input_dir[-38:] if len(args.input_dir) > 40 else args.input_dir)
     
@@ -179,7 +183,7 @@ def print_args(args, hcolor, passed_args, log_func=None):
             'tree_absolute_cutoff'      : [f'Absolute cutoff:', args.tree_absolute_cutoff],
             'tree_branch_cutoff'        : [f'Branch cutoff:', args.tree_branch_cutoff],
             'tree_start_from_prev'      : [f'Start from previous trees:', args.tree_start_from_prev],
-            'tree_mask_paralogs'        : [f'Mask paralogs:', args.tree_mask_paralogs],
+            'tree_mask_paralogs'        : [f'Mask paralogs:', 'true' if args.tree_mask_paralogs == 'y' else 'false'],
             'tree_outlier_ratio'        : [f'Outlier ratio:', args.tree_outlier_ratio],
             'tree_max_trim_iterations'  : [f'Max trim iterations:', args.tree_max_trim_iterations],
             'tree_min_subtree_taxa'     : [f'Min subtree taxa:', args.tree_min_subtree_taxa],
@@ -224,22 +228,24 @@ def print_args(args, hcolor, passed_args, log_func=None):
             args_list.append(stage)
             args_list.extend(stage_args)
     
-    draw_box(args_list, hcolor, log_func)
+    draw_box(args_list, hcolor, log_func, nocolor=nocolor)
 
-def print_hcluster_warning(hcolor, log_func=None):
+def print_hcluster_warning(hcolor, log_func=None, nocolor=False):
     warning          = 'WARNING: HIERARCHICAL CLUSTERING MODE'
     visible_width    = 77
     warning_centered = warning.center(visible_width)
-    warning_with_bg  = f'\033[41m{warning_centered}\033[0m'
-    red              = '\033[31m'
+    reset = '' if nocolor else '\033[0m'
+    red_bg = '' if nocolor else '\033[41m'
+    warning_with_bg  = f'{red_bg}{warning_centered}{reset}'
+    red              = '' if nocolor else '\033[31m'
     width            = 78
     
     lines = [
-        f'{red}╭{"─" * width}╮\033[0m',
-        f'{red}│ \033[0m{warning_with_bg}{red}│\033[0m',
-        f'{red}│ \033[0m{"Hierarchical clustering is still under construction and untested.":<77}{red}│\033[0m',
-        f'{red}│ \033[0m{"Please use this feature with caution and verify results carefully.":<77}{red}│\033[0m',
-        f'{red}╰{"─" * width}╯\033[0m'
+        f'{red}╭{"─" * width}╮{reset}',
+        f'{red}│ {reset}{warning_with_bg}{red}│{reset}',
+        f'{red}│ {reset}{"Hierarchical clustering is still under construction and untested.":<77}{red}│{reset}',
+        f'{red}│ {reset}{"Please use this feature with caution and verify results carefully.":<77}{red}│{reset}',
+        f'{red}╰{"─" * width}╯{reset}'
     ]
     
     for line in lines:

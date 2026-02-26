@@ -5,10 +5,12 @@ from pathlib import Path
 from core.utils.printout import PrintOut
 
 class Deps:
-    def __init__(self, log_level, hcolor, bcolor):
-        self.hcolor     = hcolor
-        self.bcolor     = bcolor
-        self.printClass = PrintOut(log_level, hcolor, bcolor)
+    def __init__(self, log_level, hcolor, bcolor, nocolor=False):
+        self.hcolor     = '' if nocolor else hcolor
+        self.bcolor     = '' if nocolor else bcolor
+        self.printClass = PrintOut(log_level, self.hcolor, self.bcolor)
+        if nocolor:
+            self.printClass.set_nocolor(True)
         self.printout   = self.printClass.printout
 
         self.deps = {

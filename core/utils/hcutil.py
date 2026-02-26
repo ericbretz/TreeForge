@@ -4,14 +4,13 @@ import re
 import shutil
 import subprocess
 from collections     import OrderedDict, defaultdict
-from collections.abc import Iterable
 from pathlib         import Path
 from tempfile        import mkstemp, mkdtemp
-from typing          import Union, Optional, List, Tuple, Dict, Set, Any
+from typing          import Union, Optional, List, Tuple, Dict, Set, Any, Iterable
 from Bio.Seq         import Seq as BioSeq
 from Bio             import SeqIO
 
-type Node = dict[str, "Node | None"]
+Node = Dict[str, Optional["Node"]]
 
 RES_COLS_VSCH: List[str] = ["query", "target"]
 
@@ -26,7 +25,11 @@ def _truncate_for_terminal(message: str, width: int = 80) -> str:
 
 def run(cmd: List[str], in_txt: Optional[str] = None, capture: bool = True, 
         cwd: Optional[str] = None, do_not_raise: bool = False, text: bool = True) -> subprocess.CompletedProcess:
-    out = subprocess.run(cmd, input=in_txt, capture_output=capture, cwd=cwd, text=text)
+    kwargs = {'input': in_txt, 'cwd': cwd, 'universal_newlines': text}
+    if capture:
+        kwargs['stdout'] = subprocess.PIPE
+        kwargs['stderr'] = subprocess.PIPE
+    out = subprocess.run(cmd, **kwargs)
     if not do_not_raise and out.returncode > 0:
         raise Exception(out.stderr)
     return out
@@ -184,7 +187,7 @@ def parse_newick(s: str) -> Node:
     n_id = noder(start=max_n_number + 1)
     idx = 0
 
-    def parse_subtree() -> tuple[str, Node | None]:
+    def parse_subtree() -> Tuple[str, Optional[Node]]:
         nonlocal idx
         if idx >= len(newick):
             raise ValueError("Unexpected end of Newick string while parsing subtree")
@@ -192,7 +195,7 @@ def parse_newick(s: str) -> Node:
         c = newick[idx]
         if c == "(":
             idx += 1
-            children: list[tuple[str, Node | None]] = []
+            children: List[Tuple[str, Optional[Node]]] = []
 
             while True:
                 name, subtree = parse_subtree()
@@ -210,7 +213,7 @@ def parse_newick(s: str) -> Node:
                 else:
                     raise ValueError(f"Unexpected character '{newick[idx]}' in internal node")
 
-            label_chars: list[str] = []
+            label_chars: List[str] = []
             while idx < len(newick) and newick[idx] not in ",()":
                 label_chars.append(newick[idx])
                 idx += 1
@@ -227,7 +230,7 @@ def parse_newick(s: str) -> Node:
 
             return label, children_dict
 
-        label_chars: list[str] = []
+        label_chars: List[str] = []
         while idx < len(newick) and newick[idx] not in ",()":
             label_chars.append(newick[idx])
             idx += 1
@@ -263,8 +266,8 @@ def parse_newick_file(path: str) -> Node:
 def parse_nodes_dict_to_steps(
     nodes    : Node,
     node_name: Optional[str] = None,
-    steps    : Optional[OrderedDict[str, List[str]]] = None,
-) -> tuple[OrderedDict[str, List[str]], Set[str]]:
+    steps    : Optional[Dict[str, List[str]]] = None,
+) -> Tuple[Dict[str, List[str]], Set[str]]:
     if steps is None:
         steps = OrderedDict()
     node_set: Set[str] = set()
@@ -398,7 +401,10 @@ def run_sub_hc_vsearch(
         else:
             _   : int
             tmpf: str
-            _, tmpf = mkstemp(text=True)
+            try:
+                _, tmpf = mkstemp(text=True)
+            except TypeError:
+                _, tmpf = mkstemp()
             combine_text_files(fastas, tmpf)
             input_file = tmpf
             cleanup_temp = True
@@ -445,7 +451,10 @@ def run_sub_hc_mmseqs2(
             input_file = precombined_file
             cleanup_input = False
         else:
-            _, tmpf = mkstemp(text=True, suffix='.fasta')
+            try:
+                _, tmpf = mkstemp(text=True, suffix='.fasta')
+            except TypeError:
+                _, tmpf = mkstemp(suffix='.fasta')
             combine_text_files(fastas, tmpf)
             input_file = tmpf
             cleanup_input = True

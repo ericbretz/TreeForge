@@ -190,7 +190,10 @@ class HCluster(BaseStage):
     
     def _create_precombined_file(self, fastas_user: List[str]) -> Optional[str]:
         try:
-            _, tmpf = mkstemp(text=True, suffix='.fasta', prefix='hcluster_combined_')
+            try:
+                _, tmpf = mkstemp(text=True, suffix='.fasta', prefix='hcluster_combined_')
+            except TypeError:
+                _, tmpf = mkstemp(suffix='.fasta', prefix='hcluster_combined_')
             combine_text_files(fastas_user, tmpf)
             # self.printout('metric', f'Pre-combined {len(fastas_user)} FASTA files for efficiency')
             return tmpf
@@ -285,7 +288,10 @@ class HCluster(BaseStage):
                 level_groups = levels_to_groups[level]
                 self.printout('metric', f'Processing depth {level}: {len(level_groups)} clades')
                 
-                executor = ProcessPoolExecutor(max_workers=max_workers, initializer=_worker_init)
+                try:
+                    executor = ProcessPoolExecutor(max_workers=max_workers, initializer=_worker_init)
+                except TypeError:
+                    executor = ProcessPoolExecutor(max_workers=max_workers)
                 try:
                     future_to_group = {}
                     for grp_name in level_groups:
