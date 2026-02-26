@@ -25,7 +25,7 @@ from core.utils.constants import FASTA_EXTENSIONS
 
 MAJOR = 0
 MINOR = 4
-PATCH = 0
+PATCH = 1
 
 VERSION = f"{MAJOR}.{MINOR}.{PATCH}"
 
@@ -33,8 +33,9 @@ class TreeForge:
     def __init__(self):
         self.early_log_lines = []
         self._log_writer = lambda text: self.early_log_lines.append(text)
-        
-        self.highlight_color, self.background_color = print_logo(VERSION, log_func=self._log_writer) #looks great on a black terminal, but ubuntu default terminal makes me cry.
+        nocolor_init = '--nocolor' in sys.argv
+
+        self.highlight_color, self.background_color = print_logo(VERSION, log_func=self._log_writer, nocolor=nocolor_init)
         self.printClass                             = PrintOut('', self.highlight_color, self.background_color)
         self.printout                               = self.printClass.printout
         self.config_manager                         = ConfigManager(self.highlight_color, self.background_color)
@@ -46,6 +47,7 @@ class TreeForge:
         self.original_defaults['subprocess_logs']   = False
         self.original_defaults['help']              = False
         self.original_defaults['version']           = False
+        self.original_defaults['nocolor']          = False
 
     def parser(self, config_values=None):
         if len(sys.argv) == 1:
@@ -60,7 +62,8 @@ class TreeForge:
         self.defaults_dict['subprocess_logs'] = False
         self.defaults_dict['help']            = False
         self.defaults_dict['version']         = False
-        
+        self.defaults_dict['nocolor']        = False
+
         if config_values:
             for key, value in config_values.items():
                 if key in self.defaults_dict:
@@ -167,6 +170,7 @@ class TreeForge:
         
         # Standard
         parser.add_argument("--version",                    "-v",               help="Print version",                                                                                       action="store_true",)
+        parser.add_argument("--nocolor",                                        help="Disable colored terminal output",                                                             default=self.defaults_dict['nocolor'],                    action="store_true")
         parser.add_argument("--log",                        "-l",   type=int,   help=argparse.SUPPRESS,                             default=self.defaults_dict['log'],                      choices=[0, 1, 2, 3, 4])
         parser.add_argument("--help",                       "-h",               help=argparse.SUPPRESS,                             default=self.defaults_dict['help'],                     action="store_true")
         
@@ -188,8 +192,15 @@ class TreeForge:
     def run(self):
         args = self.parser()
 
+        nocolor = getattr(args, 'nocolor', False)
+        if nocolor:
+            self.highlight_color = ''
+            self.background_color = ''
+            self.printClass.set_nocolor(True)
+            self.config_manager.set_nocolor(True)
+
         if args.help:
-            print_help(self.highlight_color, self.original_defaults)
+            print_help(self.highlight_color, self.original_defaults, nocolor=nocolor)
             sys.exit()
         if args.version:
             print(f"TreeForge v{VERSION}")
@@ -223,6 +234,12 @@ class TreeForge:
         
         if config_values:
             args = self.parser(config_values)
+            nocolor = getattr(args, 'nocolor', False)
+            if nocolor:
+                self.highlight_color = ''
+                self.background_color = ''
+                self.printClass.set_nocolor(True)
+                self.config_manager.set_nocolor(True)
 
         # you can load a config with --config config.yaml and then save a copy with updated values with --config-save config2.yaml
         config_save_used = getattr(args, 'config_save', False)
@@ -245,15 +262,15 @@ class TreeForge:
         
         args.highlight_color  = self.highlight_color
         args.background_color = self.background_color
-        
-        print_args(args, args.highlight_color, passed_args, log_func=self._log_writer)
-        
+
+        print_args(args, args.highlight_color, passed_args, log_func=self._log_writer, nocolor=nocolor)
+
         # Print warning if hierarchical clustering is enabled
         # Still very much under construction and minimally tested
         if args.hcluster_enabled:
-            print_hcluster_warning(args.highlight_color, log_func=self._log_writer)
-        
-        deps = Deps(args.log, args.highlight_color, args.background_color)
+            print_hcluster_warning(args.highlight_color, log_func=self._log_writer, nocolor=nocolor)
+
+        deps = Deps(args.log, args.highlight_color, args.background_color, nocolor=nocolor)
         deps.check_deps()
         self._file_exists(args.input_dir)
         dataHub = DataHub(args)
