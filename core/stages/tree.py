@@ -1,4 +1,5 @@
 import os
+import re
 import pysam
 import shutil
 from pathlib                    import Path
@@ -33,8 +34,8 @@ class Tree(BaseStage):
                  max_trim_iterations,
                  min_subtree_taxa,
                  min_tree_leaves,
-                 clutter=False,
-                 shared_printClass=None):
+                 clutter           = False,
+                 shared_printClass = None):
         
         super().__init__(log, hc, bc, threads, shared_printClass=shared_printClass)
         self.dir_base            = Path(dir_base)
@@ -68,12 +69,14 @@ class Tree(BaseStage):
         self._seq_dict_alt_cache = None
         
     def _get_base_cluster_id(self, cluster_id):
-        """Extract the base cluster ID from a potentially numbered cluster ID."""
-        if '_' in cluster_id and cluster_id.split('_')[-1].isdigit():
-            parts = cluster_id.split('_')
-            if len(parts) > 1 and parts[-1].isdigit():
-                return '_'.join(parts[:-1])
-        return cluster_id
+        """Strip CutBranches piece suffix _p{N} to get the base cluster ID."""
+        m = re.match(r'^(.+)_p\d+$', cluster_id)
+        return m.group(1) if m else cluster_id
+
+    def _base_cluster_name(self, cluster_id):
+        """Extract the bare cluster name (e.g. 'cluster50') from any accumulated cluster_id."""
+        m = re.match(r'^(cluster\d+)', cluster_id)
+        return m.group(1) if m else cluster_id
         
     def run(self):
         """
@@ -107,8 +110,7 @@ class Tree(BaseStage):
         if 'file_details' in result:
             for file_detail in result['file_details']:
                 if file_detail.get('status') == 'processed' and file_detail.get('modified', False):
-                    cluster_id = get_clusterID(file_detail['filename'])
-                    self.modified_files.add(cluster_id)
+                    self.modified_files.add(Path(file_detail['filename']).stem)
 
     def mask_tips(self):
         """
@@ -118,7 +120,7 @@ class Tree(BaseStage):
         mask_tips = MaskTips(self.dir_tree,
                              self.dir_mafft,
                              self.para,
-                             self.tree_ending,
+                             '.tt',
                              self.hc,
                              self.min_tree_leaves)
         result = mask_tips.run()
@@ -128,8 +130,7 @@ class Tree(BaseStage):
         if 'file_details' in result:
             for file_detail in result['file_details']:
                 if file_detail.get('status') == 'processed' and file_detail.get('modified', False):
-                    cluster_id = get_clusterID(file_detail['filename'])
-                    self.modified_files.add(cluster_id)
+                    self.modified_files.add(get_clusterID(file_detail['filename']))
 
     def cut_branches(self):
         """
@@ -156,7 +157,7 @@ class Tree(BaseStage):
     def _load_sequence_cache(self):
 
         if self._seq_dict_cache is None:
-            self._seq_dict_cache = {}
+            self._seq_dict_cache     = {}
             self._seq_dict_alt_cache = {}
             with pysam.FastxFile(self.concatenated_fasta) as f:
                 for entry in f:
@@ -183,12 +184,21 @@ class Tree(BaseStage):
         
         seq_dict, seq_dict_alt = self._load_sequence_cache()
 
-        written_files   = []
-        subtree_files   = [f for f in os.listdir(current_iter_dir) if f.endswith('.subtree')]
+        written_files = []
+        subtree_files = sorted(f for f in os.listdir(current_iter_dir) if f.endswith('.subtree'))
         total_sequences = 0
         files_written   = 0
         files_skipped   = 0
-        
+        pieces_per_base = {}
+        for filename in subtree_files:
+            cluster_id      = get_clusterID(filename)
+            base_cluster_id = self._get_base_cluster_id(cluster_id)
+            if base_cluster_id in self.modified_files:
+                base_name = self._base_cluster_name(cluster_id)
+                pieces_per_base[base_name] = pieces_per_base.get(base_name, 0) + 1
+
+        cluster_counters = {}
+
         for filename in subtree_files:
             cluster_id = get_clusterID(filename)
             base_cluster_id = self._get_base_cluster_id(cluster_id)
@@ -196,7 +206,14 @@ class Tree(BaseStage):
             if base_cluster_id in self.modified_files:
                 with open(Path(current_iter_dir) / filename, "r") as infile:
                     intree = parse(infile.readline())
-                outname = str(out_dir / f"{cluster_id}.fa")
+                base_name = self._base_cluster_name(cluster_id)
+                if pieces_per_base[base_name] == 1:
+                    clean_name = f"{base_name}_{next_iter}"
+                else:
+                    count      = cluster_counters.get(base_name, 1)
+                    clean_name = f"{base_name}_{next_iter}_{count}"
+                    cluster_counters[base_name] = count + 1
+                outname = str(out_dir / f"{clean_name}.fa")
                 labels            = get_front_labels(intree)
                 sequences_written = 0
                 with open(outname, "w") as outfile:

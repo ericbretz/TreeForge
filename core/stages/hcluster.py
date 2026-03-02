@@ -52,7 +52,7 @@ def _process_group_worker(
     precombined_file: Optional[str],            # pre-combined fasta if available
 ) -> Tuple[str, Optional[Dict[str, Set[str]]], List[str], bool]:
     """
-    Process a clustering group.
+    Process a clustering group
     """
     try:
         fastas_filt_user: List[str] = []
@@ -67,7 +67,7 @@ def _process_group_worker(
                 else:
                     lookup_name = node_name
                 
-                # Match files by stem, with fallback for BUSCO files
+                # Match files by stem with fallback for BUSCO files
                 matching_files = [
                     x for x in fastas_user
                     if (Path(x).stem == lookup_name or 
@@ -195,7 +195,6 @@ class HCluster(BaseStage):
             except TypeError:
                 _, tmpf = mkstemp(suffix='.fasta', prefix='hcluster_combined_')
             combine_text_files(fastas_user, tmpf)
-            # self.printout('metric', f'Pre-combined {len(fastas_user)} FASTA files for efficiency')
             return tmpf
         except Exception as e:
             self.printout('warning', f'Failed to pre-combine FASTA files: {str(e)}')
@@ -253,7 +252,7 @@ class HCluster(BaseStage):
         precombined_file = self._create_precombined_file(fastas_user)
         
         results: Dict[str, Dict[str, Set[str]]] = {}
-        total_groups = n_groups
+        total_groups     = n_groups
         completed_groups = 0
         
         completed_percentage = f'{completed_groups/total_groups*100:.1f}%'
@@ -274,14 +273,12 @@ class HCluster(BaseStage):
         min_threads_per_worker = 4
         
         if self.threads >= min_threads_per_worker * 2:
-            max_workers = max(1, min(self.threads // min_threads_per_worker, n_groups))
+            max_workers        = max(1, min(self.threads // min_threads_per_worker, n_groups))
             threads_per_worker = max(min_threads_per_worker, self.threads // max_workers)
         else:
             max_workers = 1
             threads_per_worker = self.threads
-        
-        # self.printout('metric', f'Using {max_workers} parallel workers ({threads_per_worker} threads each, total: {max_workers * threads_per_worker})')
-        
+                
         executor = None
         try:
             for level in sorted(levels_to_groups.keys()):
@@ -382,7 +379,7 @@ class HCluster(BaseStage):
                 recs = self.get_fasta_records(fp)
                 all_seq_recs.update(recs)
             except Exception as e:
-                self.printout('warning', f'Failed to read FASTA file {fp}: {str(e)}')
+                self.printout('warning', f'Failed to read {fp}: {str(e)}')
                 continue
         
         centroid_files, _ = list_of_files_at_path(str(self.nodes_fasta_dir), ".fasta")
@@ -392,7 +389,7 @@ class HCluster(BaseStage):
                     try:
                         all_seq_recs.update(self.get_fasta_records(fp))
                     except Exception as e:
-                        self.printout('warning', f'Failed to read centroid file {fp}: {str(e)}')
+                        self.printout('warning', f'Failed to read centroid {fp}: {str(e)}')
                         continue
             
         clustered_seq_recs  : Dict[str, str] = {}
@@ -412,13 +409,13 @@ class HCluster(BaseStage):
                     missing_seqs.append(sn)
             
             if missing_seqs:
-                self.printout('warning', f'Group {grp_name}: {len(missing_seqs)} sequences not found in input files')
+                self.printout('warning', f'{grp_name}: {len(missing_seqs)} sequences not in files')
                 if len(missing_seqs) <= 5:
                     for sn in missing_seqs:
                         self.printout('warning', f'  Missing: {sn}')
             
             if not seq_recs:
-                self.printout('warning', f'No sequences found for cluster {cluster_id} in group {grp_name}')
+                self.printout('warning', f'No sequences for cluster {cluster_id} in {grp_name}')
                 continue
             
             clustered_seq_recs.update(seq_recs)

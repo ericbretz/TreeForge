@@ -123,7 +123,80 @@ class Quartet:
                 (inbp.right == self.left and inbp.left == self.right))
 
     def match(self, inq: 'Quartet') -> bool:
-        return self.same(inq)
+        if self.conflict(inq):
+            return False
+        lmatchedl = set()
+        lmatchedr = set()
+        for i in self.lefts:
+            tl = 0
+            for j in range(len(inq.lefts)):
+                if i.intersection(inq.lefts[j]):
+                    tl += 1
+                    lmatchedl.add(j)
+            for j in range(len(inq.rights)):
+                if i.intersection(inq.rights[j]):
+                    tl += 1
+                    lmatchedr.add(j)
+            if tl > 1:
+                return False
+        samed   = True
+        lmatched = lmatchedl
+        if len(lmatchedl) > 0 and len(lmatchedr) > 0:
+            return False
+        if len(lmatchedr) > 0:
+            samed    = False
+            lmatched = lmatchedr
+        if len(lmatched) < 2:
+            return False
+        rmatchedl = set()
+        rmatchedr = set()
+        for i in self.rights:
+            tl = 0
+            for j in range(len(inq.lefts)):
+                if i.intersection(inq.lefts[j]):
+                    tl += 1
+                    rmatchedl.add(j)
+            for j in range(len(inq.rights)):
+                if i.intersection(inq.rights[j]):
+                    tl += 1
+                    rmatchedr.add(j)
+            if tl > 1:
+                return False
+        if len(rmatchedl) > 0 and len(rmatchedr) > 0:
+            return False
+        rmatched = rmatchedr
+        if samed and len(rmatchedl) > 0:
+            return False
+        if not samed and len(rmatchedr) > 0:
+            return False
+        if not samed:
+            rmatched = rmatchedl
+        if len(rmatched) < 2:
+            return False
+        return True
+
+def unroot(tree: Node) -> Node:
+    """Convert a bifurcating rooted tree to an unrooted trifurcating tree.
+
+    The original BES algorithm requires an unrooted tree. When ASTRAL outputs a
+    rooted (bifurcating) tree, the direct child of the root produces a quartet
+    with only one group on its left side (len(lefts)==1). The match() function
+    requires len(lmatched)>=2, so that branch can never be matched — always
+    producing a 0.0 molecular length regardless of the gene tree data.
+
+    Unrooting creates a trifurcating root whose children all produce quartets
+    with 2+ left groups, enabling proper matching.
+    """
+    if len(tree.children) != 2:
+        return tree
+    c0, c1 = tree.children[0], tree.children[1]
+    to_expand = c0 if c0.children else c1
+    for grandchild in list(to_expand.children):
+        to_expand.remove_child(grandchild)
+        tree.add_child(grandchild)
+    tree.remove_child(to_expand)
+    return tree
+
 
 def get_quartet(nd: Node, rt: Node) -> Optional[Quartet]:
     if not nd.children or nd == rt:
@@ -289,33 +362,6 @@ def prepare_sp_tree(sp_tree: Node) -> Tuple[Dict[Quartet, List[float]], Dict[Qua
             q_to_n[i.data['q']]           = []
     return sp_tree_quartets, q_to_n
 
-def process_gene_trees(g_tree: List[str], sp_quartet_tree: Dict[Quartet, List[float]], sp_tree: Node, supval: float) -> Tuple[Node, Dict[Quartet, List[float]]]:
-    processed_trees  = 0
-    matched_quartets = 0
-    
-    for count, gene in enumerate(g_tree):
-        try:
-            tree = build(gene.strip())
-            processed_trees += 1
-            
-            for i in sp_quartet_tree:
-                for j in tree.iternodes():
-                    gqu = get_quartet(j, tree)
-                    if gqu and i.match(gqu):
-                        sp_quartet_tree[i].append(j.length)
-                        matched_quartets += 1
-                        check             = {list(k)[0] for k in gqu.lefts + gqu.rights if len(k) == 1}
-                        keep              = {list(k)[0] for k in i.lefts + i.rights if len(k) == 1 and list(k)[0] in check}
-                        for k in keep:
-                            ln = tree.get_tip(k).length
-                            st = sp_tree.get_tip(k)
-                            if tree not in st.data["qlntrees"]:
-                                st.data["qlntrees"].add(tree)
-                                st.data["qln"].append(ln)
-        except Exception as e:
-            continue
-    
-    return sp_tree, sp_quartet_tree
 
 def summarizer(sp_tree: Node, sp_quartet_tree: Dict[Quartet, List[float]], output_dir: Optional[str]) -> None:
     output_dir     = Path(output_dir)
@@ -394,34 +440,12 @@ def validate_tree_structure(node: Node, visited: Optional[Set[int]] = None, dept
     
     return True, "", max_child_depth
 
-def get_tree_stats(node: Node) -> Dict[str, Any]:
-    """Get statistics about a tree structure."""
-    try:
-        leaves_count   = len(list(node.leaves()))
-        internal_nodes = sum(1 for n in node.iternodes() if not n.istip)
-        total_nodes    = sum(1 for _ in node.iternodes())
-        max_depth      = 0
-        stack          = [(node, 0)]
-        while stack:
-            current, depth = stack.pop()
-            max_depth = max(max_depth, depth)
-            for child in current.children:
-                stack.append((child, depth + 1))
-        
-        return {
-            'leaves'        : leaves_count,
-            'internal_nodes': internal_nodes,
-            'total_nodes'   : total_nodes,
-            'max_depth'     : max_depth
-        }
-    except Exception as e:
-        return {'error': str(e)}
 
 class BES:
     def __init__(self, printout=None):
         self.printout = printout
 
-    def run(self, species_tree_file, gene_trees_file, output_prefix):
+    def run(self, species_tree_file, gene_trees_file, output_prefix, supval: float = 0.0):
         try:
             with open(species_tree_file, 'r') as f:
                 species_tree_str = f.read().strip()
@@ -430,7 +454,13 @@ class BES:
                 gene_trees = [line.strip() for line in f if line.strip()]
             
             sp_tree = build(species_tree_str)
-            
+
+            # BES requires an unrooted tree. ASTRAL outputs a rooted (bifurcating)
+            # tree where the root's direct child produces a quartet with only one
+            # left group, making match() always fail for that branch (0.0 length).
+            # Unrooting to a trifurcation gives every internal node 2+ left groups.
+            sp_tree = unroot(sp_tree)
+
             is_valid, error_msg, depth = validate_tree_structure(sp_tree)
             if not is_valid:
                 if self.printout:
@@ -438,7 +468,7 @@ class BES:
                 return False
             
             sp_quartet_tree, q_to_n = prepare_sp_tree(sp_tree)
-            sp_tree, sp_quartet_tree = self._process_gene_trees(gene_trees, sp_quartet_tree, sp_tree)
+            sp_tree, sp_quartet_tree = self._process_gene_trees(gene_trees, sp_quartet_tree, sp_tree, supval)
             summarizer(sp_tree, sp_quartet_tree, output_prefix)
             
         except RecursionError:
@@ -449,36 +479,36 @@ class BES:
         except Exception as e:
             if self.printout:
                 self.printout('error', f'BES pipeline error: {e}')
-            else:
-                msg = f'BES pipeline error: {e}'
-                print(msg if len(msg) <= 80 else '...' + msg[-77:])
             return False
         return True
     
-    def _process_gene_trees(self, g_tree: List[str], 
-                           sp_quartet_tree: Dict[Quartet, List[float]], 
-                           sp_tree: Node) -> Tuple[Node, Dict[Quartet, List[float]]]:
+    def _process_gene_trees(self, g_tree: List[str],
+                           sp_quartet_tree: Dict[Quartet, List[float]],
+                           sp_tree: Node,
+                           supval: float = 0.0) -> Tuple[Node, Dict[Quartet, List[float]]]:
         """Process gene trees and match quartets."""
         processed_trees = 0
-        
+
         for count, gene in enumerate(g_tree):
             try:
                 tree = build(gene.strip())
                 processed_trees += 1
-                
+
                 for i in sp_quartet_tree:
                     for j in tree.iternodes():
                         gqu = get_quartet(j, tree)
                         if gqu and i.match(gqu):
-                            sp_quartet_tree[i].append(j.length)
-                            check = {list(k)[0] for k in gqu.lefts + gqu.rights if len(k) == 1}
-                            keep  = {list(k)[0] for k in i.lefts + i.rights if len(k) == 1 and list(k)[0] in check}
-                            for k in keep:
-                                ln = tree.get_tip(k).length
-                                st = sp_tree.get_tip(k)
-                                if tree not in st.data["qlntrees"]:
-                                    st.data["qlntrees"].add(tree)
-                                    st.data["qln"].append(ln)
+                            label = j.label if j.label != "" else 0.0
+                            if supval <= float(label):
+                                sp_quartet_tree[i].append(j.length)
+                                check = {list(k)[0] for k in gqu.lefts + gqu.rights if len(k) == 1}
+                                keep  = {list(k)[0] for k in i.lefts + i.rights if len(k) == 1 and list(k)[0] in check}
+                                for k in keep:
+                                    ln = tree.get_tip(k).length
+                                    st = sp_tree.get_tip(k)
+                                    if tree not in st.data["qlntrees"]:
+                                        st.data["qlntrees"].add(tree)
+                                        st.data["qln"].append(ln)
             except RecursionError:
                 if self.printout:
                     self.printout('error', f'Recursion error at gene tree {count}')

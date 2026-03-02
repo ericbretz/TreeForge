@@ -7,20 +7,6 @@ from core.stages.base_stage import BaseStage
 from core.utils.sublogger import run_stage_subprocess, run_logged_subprocess
 from concurrent.futures  import ThreadPoolExecutor, as_completed
 
-"""
-PARALLEL FLOW:
-
-ThreadPoolExecutor
-    │
-    ├─ Worker 1: .fa → MAFFT → .aln → pxclsq → .cln → iqtree2 → .iqtree
-    │
-    ├─ Worker 2: .fa → MAFFT → .aln → pxclsq → .cln → iqtree2 → .iqtree
-    │
-    ├─ Worker 3: .fa → MAFFT → .aln → pxclsq → .cln → iqtree2 → .iqtree
-    │
-    └─ Worker N: .fa → MAFFT → .aln → pxclsq → .cln → iqtree2 → .iqtree
-"""
-
 class Mafft(BaseStage):
     def __init__(self,
                  dir_base,
@@ -35,6 +21,7 @@ class Mafft(BaseStage):
                  prev_trimmed_tree_dir: Optional[str] = None,
                  use_prev_trees_as_start: bool = False,
                  fast_mode: bool = False,
+                 seqtype: str = 'nuc',
                  subprocess_dir=None,
                  shared_printClass=None):
 
@@ -45,6 +32,7 @@ class Mafft(BaseStage):
         self.pxclsq_threshold   = pxclsq_threshold
         self.thread_divisor     = thread_divisor
         self.fast_mode          = fast_mode  # For hierarchical clustering guide trees only
+        self.seqtype            = seqtype
 
         self.prev_trimmed_tree_dir = Path(prev_trimmed_tree_dir) if prev_trimmed_tree_dir else None
         self.use_prev_trees_as_start = use_prev_trees_as_start
@@ -87,7 +75,6 @@ class Mafft(BaseStage):
         aln_file = fasta_file.replace('.fa', '.aln')
         self.aln_files.append(aln_file)
         
-        # Use faster settings for hierarchical clustering guide trees
         if self.fast_mode:
             cmd = f'mafft --retree 2 --maxiterate 0 --thread {self.threads_per_job} {fasta_file}'
         else:
@@ -95,7 +82,6 @@ class Mafft(BaseStage):
         
         try:
             if self.subprocess_dir:
-                # For logged subprocess, capture output and write to file
                 result = run_logged_subprocess(cmd, self.subprocess_dir, f'mafft_{Path(fasta_file).stem}', shell=True, check=True)
                 with open(aln_file, 'wb') as f:
                     f.write(result.stdout)
@@ -175,16 +161,19 @@ class Mafft(BaseStage):
         """
         Run IQ-TREE.
         """
-        iqtree_file = cln_file.replace('.cln', '.iqtree')
+        fa_stem     = Path(cln_file).stem
+        prefix      = str(Path(cln_file).parent / fa_stem)
+        iqtree_file = prefix + '.iqtree'
         self.iqtree_files.append(iqtree_file)
 
         def run_iqtree(cmd: str, log_suffix: str = '') -> subprocess.CompletedProcess:
             if self.subprocess_dir:
-                return run_logged_subprocess(cmd, self.subprocess_dir, f'iqtree_{Path(cln_file).stem}{log_suffix}', shell=True, check=False)
+                return run_logged_subprocess(cmd, self.subprocess_dir, f'iqtree_{fa_stem}{log_suffix}', shell=True, check=False)
             else:
                 return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
-        base_cmd = f'iqtree2 -s {cln_file} -nt {self.threads_per_job} -m GTR+G -redo -fast'
+        iqtree_model = 'LG+G' if self.seqtype == 'aa' else 'GTR+G'
+        base_cmd = f'iqtree2 -s {cln_file} -nt {self.threads_per_job} -m {iqtree_model} -redo -fast -pre {prefix}'
 
         starting_tree_used = False
         cmd_to_run = base_cmd
@@ -197,12 +186,12 @@ class Mafft(BaseStage):
                 cmd_to_run = f"{base_cmd} -t {prev_tree}"
                 starting_tree_used = True
             else:
-                self.printout('info', f'No previous tree found for {cluster_id}, running IQ-TREE without starting tree')
+                self.printout('info', f'No previous tree found for {cluster_id}')
 
         iqtree = run_iqtree(cmd_to_run, '_with_start_tree' if starting_tree_used else '')
 
         if iqtree.returncode not in [0, 2] and starting_tree_used:
-            self.printout('warning', f'IQ-TREE failed for {Path(cln_file).name} with starting tree, retrying without starting tree')
+            self.printout('warning', f'IQ-TREE failed for {Path(cln_file).name}')
             iqtree = run_iqtree(base_cmd)
 
         if iqtree.returncode not in [0, 2]:

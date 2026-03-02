@@ -17,14 +17,14 @@ file: file1.fasta
     con3a91231jafold01240 -> AAAAAA@00000003 -> file1
 
 file: file2.fasta
-    contigD@scaffold01241 -> AAAAAA@00000004 -> file2
-    contigE@scaffold01242 -> AAAAAA@00000005 -> file2
-    contigF@scaffold01243 -> AAAAAA@00000006 -> file2
+    contigD@scaffold01241 -> BBBBBB@00000001 -> file2
+    contigE@scaffold01242 -> BBBBBB@00000002 -> file2
+    contigF@scaffold01243 -> BBBBBB@00000003 -> file2
 
 file: file3.fasta
-    contigG@scaffold01244 -> AAAAAA@00000007 -> file3
-    contigH@scaffold01245 -> AAAAAA@00000008 -> file3
-    contigI@scaffold01246 -> AAAAAA@00000009 -> file3
+    contigG@scaffold01244 -> CCCCCC@00000001 -> file3
+    contigH@scaffold01245 -> CCCCCC@00000002 -> file3
+    contigI@scaffold01246 -> CCCCCC@00000003 -> file3
 
 Final Tree:
     ┌── file1

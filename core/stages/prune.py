@@ -1,6 +1,5 @@
 import os
 import shutil
-from ete3 import Tree
 from pathlib                    import Path
 from core.stages.base_stage     import BaseStage
 from core.treeutils.trimtips    import TrimTips
@@ -20,10 +19,10 @@ class Prune(BaseStage):
                  bc,
                  prune_relative_cutoff,
                  prune_absolute_cutoff,
-                 prune_outlier_ratio=20.0,
-                 prune_max_trim_iterations=10,
-                 prune_min_tree_leaves=3,
-                 shared_printClass=None):
+                 prune_outlier_ratio       = 10.0,
+                 prune_max_trim_iterations = 10,
+                 prune_min_tree_leaves     = 3,
+                 shared_printClass         = None):
         
         super().__init__(log, hc, bc, threads, shared_printClass=shared_printClass)
         self.dir_base            = Path(dir_base)
@@ -71,7 +70,6 @@ class Prune(BaseStage):
                     intree = parse(infile.readline())
                 
                 curroot = intree
-                pp_trees = []
                 
                 if self.get_front_score(curroot) >= self.minimum_taxa:
                     self.ortho1to1_files.append(st)
@@ -240,16 +238,9 @@ class Prune(BaseStage):
                 max_trim_iterations = self.max_trim_iterations,
                 min_tree_leaves     = self.min_tree_leaves
             )
-            
-            ete_tree = Tree(tostring(tree) + ";")
-            
-            trimmed_ete_tree = trimmer.trim(ete_tree, self.relative_tip_cutoff, self.absolute_tip_cutoff)
-            
-            if trimmed_ete_tree is not None:
-                trimmed_str = trimmed_ete_tree.write(format=1)
-                return parse(trimmed_str)
+            return trimmer.trim(tree, self.relative_tip_cutoff, self.absolute_tip_cutoff)
             
         except Exception as e:
             self.printout('error', f'Error trimming tree: {str(e)}')
         
-        return tree
+        return None

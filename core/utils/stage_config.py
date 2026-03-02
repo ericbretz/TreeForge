@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 
 @dataclass
@@ -50,7 +51,7 @@ class PruneConfig:
 
 @dataclass
 class PrankConfig:
-    seqtype             : str
+    seqtype             : Optional[str]
     pxclsq_threshold    : float
     bootstrap           : int
 
@@ -83,7 +84,8 @@ class PipelineConfig:
     iterations     : int
     threads        : int
     clutter        : bool
-    seqtype        : str
+    seqtype        : Optional[str]
+    astral_jar     : Optional[str]
     subprocess_logs: bool
 
     dir_base       : Path
@@ -153,7 +155,7 @@ class PipelineConfig:
         )
         
         prank_config = PrankConfig(
-            seqtype             = args.prank_seqtype,
+            seqtype             = args.seqtype,
             pxclsq_threshold    = args.prank_pxclsq_threshold,
             bootstrap           = args.prank_bootstrap
         )
@@ -190,7 +192,8 @@ class PipelineConfig:
             iterations             = args.iter,
             threads                = args.threads,
             clutter                = args.clutter,
-            seqtype                = args.prank_seqtype,
+            seqtype                = args.seqtype,
+            astral_jar             = getattr(args, 'astral_jar', None),
             subprocess_logs        = getattr(args, 'subprocess_logs', False),
             dir_base               = dir_base,
             output_dir             = output_dir,

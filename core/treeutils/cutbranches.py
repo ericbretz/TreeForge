@@ -116,41 +116,38 @@ class CutBranches:
 					metrics['file_details'].append(file_metrics)
 					continue
 
-				count = 0
-				valid_subtrees = 0
-				for i, subtree in enumerate(subtrees, 1):
-					subtree_taxa = self.count_taxa(subtree)
-					if subtree_taxa >= self.min_subtree_taxa:
-						valid_subtrees += 1
-						if subtree.nchildren == 2:
-							_, subtree = remove_kink(subtree, subtree)
-						count += 1
-						# output_path = self.dir_trimmed / f"{tree_file.stem}.subtree"  # whoops..
-						output_path = self.dir_trimmed / f"{tree_file.stem}_{i}.subtree"
-						with open(output_path, "w") as outfile:
-							outfile.write(tostring(subtree)+";\n")
-						file_metrics['subtree_sizes'].append(len(subtree.leaves()))
-                            
-				if count > 0:
-					self.processed_count  			                += 1
-					metrics['processed_count']                      += 1
-					metrics['total_counts']['large_subtrees']       += count
-					metrics['total_counts']['small_subtrees']       += len(subtrees) - count
-					file_metrics['large_subtrees']                   = count
-					file_metrics['small_subtrees']                   = len(subtrees) - count
-					file_metrics['status']                           = 'cut'
-				else:
-					metrics['total_counts']['small_subtrees'] += len(subtrees)
-					output_path = self.dir_trimmed / f"{tree_file.stem}.subtree"
-					with open(tree_file, "r") as infile:
-						with open(output_path, "w") as outfile:
-							outfile.write(infile.read())
-					self.processed_count 			  += 1
-					metrics['processed_count']  	  += 1
-					file_metrics['small_subtrees']     = len(subtrees)
-					file_metrics['status']             = 'copied_original'
-				
-				metrics['file_details'].append(file_metrics)
+			count = 0
+			for subtree in subtrees:
+				subtree_taxa = self.count_taxa(subtree)
+				if subtree_taxa >= self.min_subtree_taxa:
+					if subtree.nchildren == 2:
+						_, subtree = remove_kink(subtree, subtree)
+					count += 1
+					output_path = self.dir_trimmed / f"{tree_file.stem}_p{count}.subtree"
+					with open(output_path, "w") as outfile:
+						outfile.write(tostring(subtree)+";\n")
+					file_metrics['subtree_sizes'].append(len(subtree.leaves()))
+
+			if count > 0:
+				self.processed_count                            += 1
+				metrics['processed_count']                      += 1
+				metrics['total_counts']['large_subtrees']       += count
+				metrics['total_counts']['small_subtrees']       += len(subtrees) - count
+				file_metrics['large_subtrees']                   = count
+				file_metrics['small_subtrees']                   = len(subtrees) - count
+				file_metrics['status']                           = 'cut'
+			else:
+				metrics['total_counts']['small_subtrees'] += len(subtrees)
+				output_path = self.dir_trimmed / f"{tree_file.stem}.subtree"
+				with open(tree_file, "r") as infile:
+					with open(output_path, "w") as outfile:
+						outfile.write(infile.read())
+				self.processed_count              += 1
+				metrics['processed_count']        += 1
+				file_metrics['small_subtrees']     = len(subtrees)
+				file_metrics['status']             = 'copied_original'
+
+			metrics['file_details'].append(file_metrics)
 
 		metrics['total_counts']['total_subtrees'] = metrics['total_counts']['large_subtrees'] + metrics['total_counts']['small_subtrees']
 		

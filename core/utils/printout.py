@@ -3,10 +3,10 @@ from typing import Any, Dict, List, Optional
 
 class PrintOut:
     def __init__(self, level, hc, bc, log_file: Optional[str] = None):
-        self.level = level
-        self.hc = hc or ''
-        self.bc = bc or ''
-        self.nocolor = False
+        self.level    = level
+        self.hc       = hc or ''
+        self.bc       = bc or ''
+        self.nocolor  = False
         self.log_file = log_file
 
         if self.log_file:
@@ -14,7 +14,7 @@ class PrintOut:
         else:
             self.log_handle = None
         self._last_progress_msg = None
-        self._progress_started = False
+        self._progress_started  = False
 
         self._init_styles()
 
@@ -30,21 +30,22 @@ class PrintOut:
 
         self._reset = '\033[0m'
         self.styles = {
-            'title':    {'color': c,   'width': 80, 'char': ' '},
+            'title'   : {'color': c,   'width': 80, 'char': ' '},
             'subtitle': {'color': c,   'width': 80, 'char': ' '},
-            'metric':   {'color': '\033[107m',   'width': 80, 'char': ' '},
-            'info':     {'color': info_c, 'width': 80, 'char': ' '},
-            'warning':  {'color': warn_c, 'width': 80, 'char': ' '},
+            'metric'  : {'color': '\033[107m',   'width': 80, 'char': ' '},
+            'info'    : {'color': info_c, 'width': 80, 'char': ' '},
+            'warning' : {'color': warn_c, 'width': 80, 'char': ' '},
             'progress': {'color': prog_c, 'width': 80, 'char': ' '},
-            'error':    {'color': err_c,  'width': 80, 'char': ' '},
-            'debug':    {'color': dbg_c,  'width': 80, 'char': ' '},
-            'success':  {'color': succ_c, 'width': 80, 'char': ' '},
+            'error'   : {'color': err_c,  'width': 80, 'char': ' '},
+            'debug'   : {'color': dbg_c,  'width': 80, 'char': ' '},
+            'success' : {'color': succ_c, 'width': 80, 'char': ' '},
         }
  
         self.key_translate = {
             'time'                           : 'Total Time',
             'dir'                            : 'Directory',
             # BLAST
+            'seqtype'                        : 'Sequence Type',
             'contig_count'                   : 'Contig Count',
             'raw_blast'                      : 'Raw BLAST',
             'concatenated'                   : 'Concatenated',
@@ -196,7 +197,7 @@ class PrintOut:
             self.log_handle.write(f"PROGRESS END: {clean_text}\n")
             self.log_handle.flush()
             self._last_progress_msg = None
-            self._progress_started = False
+            self._progress_started  = False
     
     def _write_to_log(self, text: str) -> None:
         """Write plain text (no ANSI codes) to log file"""

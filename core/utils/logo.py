@@ -75,11 +75,14 @@ def print_help(hcolor, defaults, log_func=None, nocolor=False):
         f'--input-dir                 -d    DIR     Directory of FASTA files   (./)',
         f'--iter                      -i    INT     Number of iterations       ({defaults["iter"]})',
         f'--threads                   -t    INT     Number of threads          ({defaults["threads"]})',
-        f'--clutter                   -c    BOOL    Remove Intermediate Files  ({defaults["clutter"]})',
         f'--output-dir                -o    DIR     Output directory           (./)',
+        '',
+        'BASIC-OPTIONAL:',
+        f'--astral-jar                -aj   PATH    Path to ASTRAL             (bin)',
         f'--subprocess-logs           -sl   BOOL    Save subprocess logs       ({defaults["subprocess_logs"]})',
-        f'--nocolor                         BOOL    Disable color in terminal',
-
+        f'--nocolor                   -nc   BOOL    Disable color in terminal  (false)',
+        f'--clutter                   -c    BOOL    Remove Intermediate Files  ({defaults["clutter"]})',
+        f'--seqtype                   -st   STR     Sequence type (nuc/aa)     (auto)',
         '',
         'BLAST:',
         f'--blast-evalue              -be   FLOAT   BLAST E-value threshold    ({defaults["blast_evalue"]})',
@@ -118,7 +121,6 @@ def print_help(hcolor, defaults, log_func=None, nocolor=False):
         f'--prune-min-tree-leaves     -pml  INT     Min tree leaves for prune  ({defaults["prune_min_tree_leaves"]})',
         '',
         'PRANK:',
-        # f'--prank-seqtype             -ps   STR     Sequence type              ({defaults["prank_seqtype"]})',
         f'--prank-pxclsq-threshold    -pp   FLOAT   pxclsq prob threshold      ({defaults["prank_pxclsq_threshold"]})',
         f'--prank-bootstrap           -pb   INT     IQ-TREE bootstraps         ({defaults["prank_bootstrap"]})',
         '',
@@ -142,24 +144,27 @@ def print_help(hcolor, defaults, log_func=None, nocolor=False):
         f'--busco-coverage-threshold  -bcc  FLOAT   BUSCO coverage threshold   ({defaults["busco_coverage_threshold"]})',
         '',
         'CONFIG:',
-        '--config                          PATH    Path to config file',
-        '--config-create [NAME]            BOOL    Create config template',
-        '--config-save [NAME]              BOOL    Save args to config',
+        f'--config                    -cfg  PATH    Path to config file   ',
+        f'--config-create [NAME]      -cfc  BOOL    Create config template',
+        f'--config-save [NAME]        -cfs  BOOL    Save args to config   ',
     ]
     draw_box(help_lines, hcolor, log_func, nocolor=nocolor)
 
 def print_args(args, hcolor, passed_args, log_func=None, nocolor=False):
     """Print command line args in formatted box."""
     dir_path = str(os.getcwd())[-30:] if not args.input_dir else ('..' + args.input_dir[-38:] if len(args.input_dir) > 40 else args.input_dir)
-    
+    dir_astral = str('..' + args.astral_jar[-38:] if args.astral_jar and len(args.astral_jar) > 40 else args.astral_jar) if args.astral_jar else 'binary'
     arg_mappings = {
         'BASIC:': {
             'input_dir'                 : [f'Directory:', dir_path],
             'iter'                      : [f'Iterations:', args.iter],
             'threads'                   : [f'Threads:', args.threads],
-            'clutter'                   : [f'Clutter:', args.clutter],
             'output_dir'                : [f'Output directory:', args.output_dir if args.output_dir else 'Same as input'],
+            'astral_jar'                : [f'ASTRAL:', dir_astral],
             'subprocess_logs'           : [f'Subprocess logs:', args.subprocess_logs],
+            'nocolor'                   : [f'No color:', args.nocolor],
+            'clutter'                   : [f'Clutter:', args.clutter],
+            'seqtype'                   : [f'Sequence type:', args.seqtype if args.seqtype else 'auto-detect'],
         },
         'BLAST:': {
             'blast_evalue'              : [f'E-value:', args.blast_evalue],
@@ -198,7 +203,6 @@ def print_args(args, hcolor, passed_args, log_func=None, nocolor=False):
             'prune_min_tree_leaves'     : [f'Min tree leaves:', args.prune_min_tree_leaves],
         },
         'PRANK:': {
-            # 'prank_seqtype'             : [f'Sequence type:', args.prank_seqtype],
             'prank_pxclsq_threshold'    : [f'pxclsq threshold:', args.prank_pxclsq_threshold],
             'prank_bootstrap'           : [f'Bootstrap replicates:', args.prank_bootstrap],
         },

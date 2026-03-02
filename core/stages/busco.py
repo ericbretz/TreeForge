@@ -1,9 +1,6 @@
 import sys
 import os
 import pysam
-import subprocess
-import glob
-import shutil
 from pathlib import Path
 from core.stages.base_stage import BaseStage
 from core.utils.sublogger import run_stage_subprocess
@@ -25,29 +22,28 @@ class Busco(BaseStage):
                  busco_coverage_threshold,
                  hcluster_id,
                  hcluster_iddef,
-                 species_tree_file=None,
-                 id_to_stem=None,
-                 subprocess_dir=None,
-                 shared_printClass=None):
+                 species_tree_file = None,
+                 id_to_stem        = None,
+                 subprocess_dir    = None,
+                 shared_printClass = None):
         super().__init__(log, hc, bc, threads, subprocess_dir, shared_printClass)
-        self.dir_base           = Path(dir_base)
-        self.dir_treeforge      = Path(dir_treeforge)
-        self.dir_busco_root     = Path(dir_busco)
-        self.dir_busco          = Path(dir_busco) / 'busco'
-        self.dir_iteration      = Path(dir_iteration)
-        self.files_fasta        = files_fasta
-        self.busco_evalue       = busco_evalue
-        self.busco_max_targets  = busco_max_targets
+        self.dir_base                 = Path(dir_base)
+        self.dir_treeforge            = Path(dir_treeforge)
+        self.dir_busco_root           = Path(dir_busco)
+        self.dir_busco                = Path(dir_busco) / 'busco'
+        self.dir_iteration            = Path(dir_iteration)
+        self.files_fasta              = files_fasta
+        self.busco_evalue             = busco_evalue
+        self.busco_max_targets        = busco_max_targets
         self.busco_coverage_threshold = busco_coverage_threshold
-        self.hcluster_id        = hcluster_id
-        self.hcluster_iddef     = hcluster_iddef
-        self.species_tree_file  = species_tree_file
-        self.id_to_stem         = id_to_stem if id_to_stem is not None else {}
-        
-        self.busco_count        = 0
-        self.return_dict        = {
-                                    'busco_count'      : self.busco_count,
-                                    'busco_output_dir' : str(self.dir_busco)
+        self.hcluster_id              = hcluster_id
+        self.hcluster_iddef           = hcluster_iddef
+        self.species_tree_file        = species_tree_file
+        self.id_to_stem               = id_to_stem if id_to_stem is not None else {}
+        self.busco_count              = 0
+        self.return_dict              = {
+                                    'busco_count'     : self.busco_count,
+                                    'busco_output_dir': str(self.dir_busco)
                                 }
 
     def run(self):
@@ -67,9 +63,9 @@ class Busco(BaseStage):
 
     def extract_busco_genes(self):
         """
-        Extract BUSCO genes using DIAMOND.
+        Extract BUSCO genes using MMseqs2.
         """
-        self.printout('metric', 'Extracting BUSCO genes using DIAMOND')
+        self.printout('metric', 'Extracting BUSCO genes')
         
         if not self.files_fasta:
             self.printout('error', 'No input FASTA files provided')
@@ -99,11 +95,7 @@ class Busco(BaseStage):
             self.printout('error', f'Error reading BUSCO database: {str(e)}')
             return
         
-        self.busco_db_dir = self.dir_busco / 'busco_db'
-        
         self.dir_busco.mkdir(parents=True, exist_ok=True)
-        
-        self.make_busco_blast_db()
         
         self.busco_species_files = []
         total_files              = len(self.files_fasta)
@@ -158,29 +150,41 @@ class Busco(BaseStage):
     
     def busco_blast_search_species(self, species_fasta, output_file):
         """
-        Run BUSCO DIAMOND blastx search.
+        Run BUSCO MMseqs2 search
         """
-        db_path = self.busco_db_dir / "busco_db"
-        cmd = f'diamond blastx --query {species_fasta} --db {db_path}.dmnd --out {output_file} --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore --evalue {self.busco_evalue} --max-target-seqs {self.busco_max_targets} --threads {self.threads}'
+        species_name = Path(species_fasta).stem
+        tmp_dir      = self.dir_busco / f'mmseqs_tmp_{species_name}'
+        cmd = [
+            'mmseqs', 'easy-search',
+            str(species_fasta),
+            str(self.busco_db_path),
+            str(output_file),
+            str(tmp_dir),
+            '--threads',       str(self.threads),
+            '-e',              str(self.busco_evalue),
+            '--max-seqs',      str(self.busco_max_targets),
+            '--format-output', 'query,target,pident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits',
+            '--format-mode',   '0',
+        ]
         
         try:
-            result = run_stage_subprocess(cmd, f'BUSCO DIAMOND {Path(species_fasta).stem}', self.subprocess_dir, self.printout, check=False)
+            result = run_stage_subprocess(cmd, f'BUSCO MMseqs2 {species_name}', self.subprocess_dir, self.printout, check=False)
             if result.returncode != 0:
-                self.printout('error', f'DIAMOND blastx failed for {species_fasta}')
+                self.printout('error', f'MMseqs2 search failed for {species_fasta}')
                 if result.stderr:
                     stderr_text = result.stderr if isinstance(result.stderr, str) else result.stderr.decode('utf-8')
                     self.printout('error', stderr_text)
-                raise RuntimeError('DIAMOND search failed')
+                raise RuntimeError('MMseqs2 search failed')
             else:
                 if os.path.exists(output_file) and os.path.getsize(output_file) == 0:
-                    self.printout('warning', f'No DIAMOND results for {os.path.basename(species_fasta)}')
+                    self.printout('warning', f'No MMseqs2 results for {os.path.basename(species_fasta)}')
         except Exception as e:
-            self.printout('error', f'Error running DIAMOND search for {species_fasta}: {str(e)}')
+            self.printout('error', f'Error running MMseqs2 search for {species_fasta}: {str(e)}')
             raise
     
     def create_species_busco_fasta(self, species_fasta, blast_results, output_fasta):
         """
-        Create a species BUSCO FASTA file from DIAMOND blastx results.
+        Create a species BUSCO FASTA file from MMseqs2 search results.
         """
         busco_hit_ids = set()
         
@@ -216,33 +220,6 @@ class Busco(BaseStage):
         except Exception as e:
             self.printout('error', f'Error creating BUSCO FASTA: {str(e)}')
             raise
-    
-    
-    def make_busco_blast_db(self):
-        """
-        Build BUSCO DIAMOND database.
-        """
-        self.printout('metric', 'Build BUSCO Database')
-        self.busco_db_dir.mkdir(parents=True, exist_ok=True)
-        
-        db_path = self.busco_db_dir / "busco_db"
-        cmd = f'diamond makedb --in {self.busco_db_path} --db {db_path}'
-        
-        try:
-            result = run_stage_subprocess(cmd, 'BUSCO DIAMOND makedb', self.subprocess_dir, self.printout, check=False)
-            if result.returncode != 0:
-                self.printout('error', 'DIAMOND makedb failed')
-                if result.stderr:
-                    stderr_text = result.stderr if isinstance(result.stderr, str) else result.stderr.decode('utf-8')
-                    self.printout('error', stderr_text)
-                raise RuntimeError('DIAMOND database creation failed')
-            else:
-                return
-        except Exception as e:
-            self.printout('error', f'Error creating DIAMOND database: {str(e)}')
-            raise
-    
-    
     
     def run_hierarchical_clustering(self):
         """

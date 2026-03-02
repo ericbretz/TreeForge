@@ -1,7 +1,7 @@
 from typing import Dict, Set, List
 from pathlib import Path
 
-FASTA_EXTENSIONS    = ['.fasta', '.fa', '.fas', '.fna']
+FASTA_EXTENSIONS    = ['.fasta', '.fa', '.fas', '.fna', '.faa']
 
 CENTROIDS_SUFFIX    = '.centroids.fasta'
 CLUSTERED_SUFFIX    = '.clustered.fasta'

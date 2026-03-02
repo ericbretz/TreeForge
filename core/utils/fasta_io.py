@@ -39,16 +39,12 @@ def concatenate_fasta_files(
     output_file: Union[str, Path]
 ) -> int:
     total_count = 0
-    lines       = []
-    for input_file in input_files:
-        fasta      = pysam.FastaFile(str(input_file))
-        references = fasta.references
-        for name in references:
-            seq = fasta.fetch(name)
-            lines.append(f">{name}\n{seq}")
-            total_count += 1
-    with open(str(output_file), 'w') as f:
-        f.write("\n".join(lines))
+    with open(str(output_file), 'w') as out_f:
+        for input_file in input_files:
+            with pysam.FastxFile(str(input_file)) as fasta:
+                for entry in fasta:
+                    out_f.write(f">{entry.name}\n{entry.sequence}\n")
+                    total_count += 1
     return total_count
 
 def get_fasta_sequence_count(fasta_file: Union[str, Path]) -> int:

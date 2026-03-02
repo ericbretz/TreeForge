@@ -89,6 +89,12 @@ class DataHub:
         
         # PRANK
         self.seqtype                    = self.prank_config.seqtype
+
+        self.astral_jar = self.config.astral_jar
+        if self.astral_jar and Path(self.astral_jar).is_file() and shutil.which('java'):
+            self.astral_cmd = f'java -jar {self.astral_jar}'
+        else:
+            self.astral_cmd = 'astral'
         self.prank_pxclsq_threshold     = self.prank_config.pxclsq_threshold
         self.bootstrap_replicates       = self.prank_config.bootstrap
         
@@ -778,7 +784,7 @@ class DataHub:
         self.printout('subtitle', 'BLAST')
         
         temp_fasta_dir = self.master_dict['base']['temp_fasta']
-        all_files = [Path(f) for f in glob(str(temp_fasta_dir) + '/*') if f.endswith(tuple(['.fasta', '.fa', '.fas', '.fna']))]
+        all_files = [Path(f) for f in glob(str(temp_fasta_dir) + '/*') if f.endswith(tuple(FASTA_EXTENSIONS))]
         
         if self.hcluster_enabled:
             self.files_fasta_renamed = [f for f in all_files if '_busco_renamed.fa' in f.name]
@@ -798,10 +804,14 @@ class DataHub:
                       self.bc,                                                      # Background color
                       self.blast_evalue,                                            # BLAST E-value threshold
                       self.blast_max_targets,                                       # BLAST max target sequences
+                      self.seqtype,                                                 # Sequence type override
                       self.subprocess_dir,                                          # Subprocess output directory
                       shared_printClass=self.printClass)                            # Shared PrintOut instance
-        blast.run()
-        return blast.return_dict
+        blast_result = blast.run()
+        if self.seqtype is None:
+            self.seqtype = blast_result['seqtype']
+            self.prank_config.seqtype = self.seqtype
+        return blast_result
     
     @bilge_crew()
     def mcl(self):
@@ -853,6 +863,7 @@ class DataHub:
                       prev_trimmed_tree_dir=str(prev_trimmed_tree_dir) \
                         if prev_trimmed_tree_dir else None,                             # Previous trimmed tree directory
                       use_prev_trees_as_start=use_prev_trees_as_start,                  # Use previous trees as starting trees
+                      seqtype=self.seqtype,                                             # Sequence type (aa or nuc)
                       subprocess_dir=self.subprocess_dir,                               # Subprocess output directory
                       shared_printClass=self.printClass)                                # Shared PrintOut instance
         mafft.run()
@@ -950,6 +961,9 @@ class DataHub:
                         self.get_result_path('species_trees', 'molecular'),             # Molecular tree path
                         self.get_result_path('species_trees', 'supermatrix'),           # Supermatrix tree path
                         self.get_result_path('gene_trees'),                             # Gene trees directory
+                        self.seqtype,                                                   # Sequence type (aa or nuc)
+                        self.bes_support,                                               # BES support cutoff
+                        self.astral_cmd,                                                # ASTRAL command (binary or jar)
                         id_to_stem,                                                     # Species ID -> original name
                         self.subprocess_dir,                                            # Subprocess output directory
                         shared_printClass=self.printClass)                              # Shared PrintOut instance
@@ -1028,6 +1042,7 @@ class DataHub:
             self.pxclsq_threshold,
             self.thread_divisor,
             fast_mode=True,
+            seqtype=self.seqtype,
             subprocess_dir=self.subprocess_dir,
             shared_printClass=self.printClass
         )
@@ -1115,7 +1130,7 @@ class DataHub:
         astral_tree_file = hcluster_tree_dir / 'hcluster_guide.tre'
         self.printout('metric', 'Running ASTRAL for guide tree')
         
-        cmd         = f'astral -i {concat_tree_file} -o {astral_tree_file}'
+        cmd         = f'{self.astral_cmd} -i {concat_tree_file} -o {astral_tree_file}'
         return_code = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         if return_code.returncode != 0:
@@ -1173,7 +1188,7 @@ class DataHub:
         
         if self.hcluster_use_busco and hasattr(self, 'busco_files_fasta') and self.busco_files_fasta:
             temp_fasta_dir = self.master_dict['base']['temp_fasta']
-            all_files      = [Path(f) for f in glob(str(temp_fasta_dir) + '/*') if f.endswith(tuple(['.fasta', '.fa', '.fas', '.fna']))]
+            all_files      = [Path(f) for f in glob(str(temp_fasta_dir) + '/*') if f.endswith(tuple(FASTA_EXTENSIONS))]
             hcluster_files = [f for f in all_files if '_busco_renamed.fa' in f.name]
             
             if not hcluster_files:
