@@ -26,8 +26,8 @@ class MCL(BaseStage):
                  perfect_identity,
                  coverage_threshold,
                  min_seq_length,
-                 subprocess_dir=None,
-                 shared_printClass=None):
+                 subprocess_dir    = None,
+                 shared_printClass = None):
         super().__init__(log, hc, bc, threads, subprocess_dir, shared_printClass)
         self.dir_base           = Path(dir_base)
         self.dir_treeforge      = Path(dir_treeforge)
@@ -67,7 +67,6 @@ class MCL(BaseStage):
     def get_taxon_name(self, taxon: str) -> str:
         """
         Get taxon name from sequence ID.
-        Split sequence ID by '@' and return the first part
         """
         return taxon.split("@")[0]
 
@@ -121,7 +120,7 @@ class MCL(BaseStage):
                        qlen >= self.min_seq_length and slen >= self.min_seq_length:
                         ident_file.write('\t'.join(spls) + '\n')
                 
-                hit_key = (query, hit)
+                hit_key          = (query, hit)
                 minus_log_evalue = self.get_minus_log_evalue(spls[14])
                 
                 if hit_key in current_hits:
@@ -172,7 +171,7 @@ class MCL(BaseStage):
         return temp_path
     
     def _merge_temp_files(self, temp_files: list, output_file: str):
-        """Merge temporary files into final output, handling duplicates."""
+        """Merge temporary files into final output"""
         if not temp_files:
             open(output_file, 'w').close()
             return

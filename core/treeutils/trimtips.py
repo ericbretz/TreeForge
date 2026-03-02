@@ -3,8 +3,6 @@ from pathlib               import Path
 from core.treeutils.newick import parse, tostring
 from itertools             import combinations
 from core.treeutils.utils  import remove_kink
-from core.treeutils.phylo  import Node
-from ete3                  import Tree
 
 class TrimTips:
     def __init__(self,
@@ -121,19 +119,16 @@ class TrimTips:
             return None
         
         if len(tree.children) == 2:
-            root_node = Node(tree)
-            node_node = Node(tree)
-            node_node, root_node = remove_kink(node_node, root_node)
-            tree = Tree(root_node._ete_node.write(format=1))
+            _, tree = remove_kink(tree, tree)
 
         going     = True
         iteration = 0
         max_iterations = self.max_trim_iterations
-        while going and tree is not None and len(tree.get_leaves()) > 3 and iteration < max_iterations:
+        while going and tree is not None and len(tree.leaves()) > 3 and iteration < max_iterations:
             iteration += 1
             going = False
             
-            for node in tree.traverse():
+            for node in tree.iternodes():
                 if len(node.children) == 0:
                     self.set_node_length(node, node.length)
                     if node.length > absolute_cutoff:

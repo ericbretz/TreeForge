@@ -220,7 +220,7 @@ class MaskTips:
         if not self.is_valid_tree(curroot):
             return None
             
-        while True:
+        while len(curroot.leaves()) >= self.min_tree_leaves:
             modified = False
             for node in curroot.iternodes():
                 if not node.istip:
@@ -254,7 +254,7 @@ class MaskTips:
         if not self.is_valid_tree(curroot):
             return None
             
-        while True:
+        while len(curroot.leaves()) >= self.min_tree_leaves:
             modified = False
             for node in curroot.iternodes():
                 if not node.istip:
@@ -295,6 +295,6 @@ class MaskTips:
     
     def write_tree(self, curroot, filename):
         outpath = self.dir_tree / filename
-        outfile = outpath.with_suffix('').with_suffix('.mm')
+        outfile = outpath.parent / (outpath.stem + '.mm')
         with open(outfile, "w") as outfile:
-            outfile.write(tostring(curroot))
+            outfile.write(tostring(curroot) + ";\n")

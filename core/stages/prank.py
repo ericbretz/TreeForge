@@ -2,19 +2,11 @@ import os
 import sys
 import subprocess
 from pathlib                import Path
-from threading              import Lock
 from core.treeutils.newick  import parse
 from core.stages.base_stage import BaseStage
 from core.utils.sublogger   import run_stage_subprocess, run_logged_subprocess
 from core.utils.fasta_io    import read_fasta_sequences, write_single_sequence
-from queue                  import Queue, Empty
 from concurrent.futures     import ThreadPoolExecutor, as_completed
-
-
-"""
-Run prank, pxcslq, iqtree2. This will dynamically adjust the number of workers based on the number of threads.
-it also reallocates workers after each stage to make things move faster.
-"""
 
 class Prank(BaseStage):
     def __init__(self,
@@ -29,8 +21,8 @@ class Prank(BaseStage):
                  bc,
                  prank_pxclsq_threshold,
                  bootstrap_replicates,
-                 subprocess_dir=None,
-                 shared_printClass=None):
+                 subprocess_dir    = None,
+                 shared_printClass = None):
         super().__init__(log, hc, bc, threads, subprocess_dir, shared_printClass)
         self.dir_ortho1to1          = Path(dir_ortho1to1)
         self.dir_prank              = Path(dir_prank)
@@ -40,10 +32,10 @@ class Prank(BaseStage):
         self.prank_pxclsq_threshold = prank_pxclsq_threshold
         self.bootstrap_replicates   = bootstrap_replicates
 
-        self.prank_workers          = max(1, int(threads * 0.4))
-        self.pxclsq_workers         = max(1, int(threads * 0.2))
-        self.iqtree_workers         = max(1, int(threads * 0.4))
         self.iqtree_threads_per_job = 2
+        self.prank_workers          = threads
+        self.pxclsq_workers         = threads
+        self.iqtree_workers         = max(1, threads // self.iqtree_threads_per_job)
 
     def run(self):
         """
@@ -64,11 +56,9 @@ class Prank(BaseStage):
         for tree in self.dir_ortho1to1.glob('*.tre'):
             with open(tree, 'r') as infile:
                 intree = parse(infile.readline())
-            leaf_count = 0
             for node in intree.iternodes():
                 if node.is_leaf():
-                    leaf_count += 1
-                    parts       = node.name.split('_')
+                    parts = node.name.split('_')
                     if len(parts) >= 2:
                         if len(parts) == 2:
                             fasta_id = f"{parts[0]}@{parts[1]}"
@@ -94,8 +84,9 @@ class Prank(BaseStage):
         Run PRANK
         Single Threaded
         """
+        seqtype = '-protein' if self.dna_aa == 'aa' else '-DNA'
         out_base = fa_file.with_suffix('')
-        cmd = f"prank -d={fa_file} -o={out_base}.aln"
+        cmd = f"prank -d={fa_file} -o={out_base}.aln {seqtype}"
         
         run_stage_subprocess(cmd, f'PRANK {fa_file.stem}', self.subprocess_dir, self.printout)
             
@@ -120,20 +111,19 @@ class Prank(BaseStage):
         Run IQ-TREE.
         Single Threaded
         """
+        iqtree_model = 'LG+G' if self.dna_aa == 'aa' else 'GTR+G'
         if self.bootstrap_replicates >= 1000:
-            cmd = f"iqtree2 -s {cln_file} -nt {self.iqtree_threads_per_job} -bb {self.bootstrap_replicates} -redo -m GTR+G"
+            cmd = f"iqtree2 -s {cln_file} -nt {self.iqtree_threads_per_job} -bb {self.bootstrap_replicates} -redo -m {iqtree_model}"
         else:
-            cmd = f"iqtree2 -s {cln_file} -nt {self.iqtree_threads_per_job} -redo -m GTR+G"
+            cmd = f"iqtree2 -s {cln_file} -nt {self.iqtree_threads_per_job} -redo -m {iqtree_model}"
         
         try:
             if self.subprocess_dir:
                 result = run_logged_subprocess(cmd, self.subprocess_dir, f'prank_iqtree_{cln_file.stem}', shell=True, check=False)
-                if result.returncode not in [0, 2]:
-                    raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
             else:
-                iqtree = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-                if iqtree.returncode not in [0, 2]:
-                    raise subprocess.CalledProcessError(iqtree.returncode, cmd, iqtree.stdout, iqtree.stderr)
+                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            if result.returncode not in [0, 2]:
+                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
         except subprocess.CalledProcessError as e:
             self.printout('error', 'IQ-TREE2 failed')
             if e.stderr:
@@ -143,133 +133,34 @@ class Prank(BaseStage):
 
     def run_optimized(self, files):
         """
-        Run PRANK, PXCLSQ, IQ-TREE in parallel.
+        Run PRANK, PXCLSQ, IQ-TREE sequentially
         """
-        results          = []
-        total_files      = len(files)
-        completed_prank  = 0
-        completed_pxclsq = 0
-        completed_iqtree = 0
-        prank_queue      = Queue()
-        pxclsq_queue     = Queue()
-        iqtree_queue     = Queue()
-        
-        progress_lock = Lock()
-        
-        def update_progress(stage, increment=1):
-            nonlocal completed_prank, completed_pxclsq, completed_iqtree
-            with progress_lock:
-                if stage == 'prank':
-                    completed_prank += increment
-                    percentage       = f'{completed_prank/total_files*100:.1f}%'
-                    self.printout('progress', f"Prank: {completed_prank}/{total_files} ({percentage})")
-                elif stage == 'pxclsq':
-                    completed_pxclsq += increment
-                    percentage        = f'{completed_pxclsq/total_files*100:.1f}%'
-                    self.printout('progress', f"Pxclsq: {completed_pxclsq}/{total_files} ({percentage})")
-                elif stage == 'iqtree':
-                    completed_iqtree += increment
-                    percentage        = f'{completed_iqtree/total_files*100:.1f}%'
-                    self.printout('progress', f"Iqtree2: {completed_iqtree}/{total_files} ({percentage})")
-
-        for file in files:
-            prank_queue.put(file)
-
-        def prank_worker():
-            while True:
-                try:
-                    fa_file = prank_queue.get(timeout=1)
-                    if fa_file is None:
-                        break
-                    
-                    fas_result = self.run_prank_single(fa_file)
-                    pxclsq_queue.put(fas_result)
-                    update_progress('prank')
-                    
-                except Empty:
-                    break
-
-        def pxclsq_worker():
-            while True:
-                try:
-                    fas_file = pxclsq_queue.get(timeout=1)
-                    if fas_file is None:
-                        break
-                    
-                    cln_result = self.run_pxclsq_single(fas_file)
-                    iqtree_queue.put(cln_result)
-                    update_progress('pxclsq')
-                    
-                except Empty:
-                    break
-
-        def iqtree_worker():
-            while True:
-                try:
-                    cln_file = iqtree_queue.get(timeout=1)
-                    if cln_file is None:
-                        break
-                    
-                    tree_result = self.run_iqtree_single(cln_file)
-                    results.append(tree_result)
-                    update_progress('iqtree')
-                    
-                except Empty:
-                    break
+        def _run_phase(fn, items, n_workers, label):
+            total     = len(items)
+            completed = 0
+            results   = []
+            with ThreadPoolExecutor(max_workers=n_workers) as executor:
+                futures = {executor.submit(fn, item): item for item in items}
+                for future in as_completed(futures):
+                    try:
+                        results.append(future.result())
+                        completed += 1
+                        self.printout('progress', f"{label}: {completed}/{total} ({completed/total*100:.1f}%)")
+                    except Exception as e:
+                        self.printout('error', f'{label} worker failed: {e}')
+                        sys.exit(1)
+            return results
 
         try:
-            with ThreadPoolExecutor(max_workers=self.prank_workers + self.pxclsq_workers + self.iqtree_workers) as executor:
-                prank_futures = [executor.submit(prank_worker) for _ in range(self.prank_workers)]
-                
-                for future in as_completed(prank_futures):
-                    try:
-                        future.result()
-                    except Exception as e:
-                        self.printout('error', f'Prank worker failed: {e}')
-                        sys.exit(1)
-                
-                for _ in range(self.prank_workers):
-                    prank_queue.put(None)
-                
-                pxclsq_futures = [executor.submit(pxclsq_worker) for _ in range(self.pxclsq_workers)]
-                
-                for future in as_completed(pxclsq_futures):
-                    try:
-                        future.result()
-                    except Exception as e:
-                        self.printout('error', f'Pxclsq worker failed: {e}')
-                        sys.exit(1)
-                
-                iqtree_futures = [executor.submit(iqtree_worker) for _ in range(self.iqtree_workers)]
-                
-                for future in as_completed(iqtree_futures):
-                    try:
-                        future.result()
-                    except Exception as e:
-                        self.printout('error', f'Iqtree worker failed: {e}')
-                        sys.exit(1)
+            fas_files = _run_phase(self.run_prank_single,  files,     self.prank_workers,  'Prank')
+            cln_files = _run_phase(self.run_pxclsq_single, fas_files, self.pxclsq_workers, 'Pxclsq')
+            trees     = _run_phase(self.run_iqtree_single, cln_files, self.iqtree_workers,  'Iqtree')
         except KeyboardInterrupt:
             self.printout('error', 'Process interrupted by user')
             raise
 
-        self.printout('metric', {'prank_trees_generated': len(results)})
-        return results
-
-    def _reallocate_resources_after_prank(self):
-        """
-        Reallocate resources after PRANK.
-        Calculate new PXCLSQ and IQ-TREE workers based on available threads.
-        """
-        available_threads   = self.threads - self.prank_workers
-        new_pxclsq_workers  = max(1, int(available_threads * 0.6))
-        new_iqtree_workers  = max(1, available_threads - new_pxclsq_workers)
-        self.pxclsq_workers = new_pxclsq_workers
-        self.iqtree_workers = new_iqtree_workers
-
-    def _reallocate_resources_after_pxclsq(self):
-        available_threads   = self.threads - self.prank_workers - self.pxclsq_workers
-        new_iqtree_workers  = max(1, available_threads // 2)
-        self.iqtree_workers = new_iqtree_workers
+        self.printout('metric', {'prank_trees_generated': len(trees)})
+        return trees
 
     def process_alignments(self):
         fa_files = list(self.dir_prank.glob('*.fa'))        
@@ -280,7 +171,7 @@ class Prank(BaseStage):
         trees = self.run_optimized(fa_files)
         
         self.return_dict.update({
-            'alignments': list(self.dir_prank.glob('*.fas')),
+            'alignments'        : list(self.dir_prank.glob('*.fas')),
             'cleaned_alignments': list(self.dir_prank.glob('*-cln')),
-            'trees': trees
+            'trees'             : trees
         })

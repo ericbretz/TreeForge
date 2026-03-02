@@ -36,10 +36,8 @@ class GeneCluster(BaseStage):
     
     def run(self):
         """
-        Run gene-based clustering for HCluster mode.
+        Run gene clustering for HCluster mode.
         """
-
-        # self.printout('metric', 'Gene-based clustering for HCluster mode')
         
         self.dir_genecluster.mkdir(parents=True, exist_ok=True)
         

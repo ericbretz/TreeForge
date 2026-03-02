@@ -25,14 +25,20 @@ class Astral(BaseStage):
                  molecular_tree_path,
                  supermatrix_tree_path,
                  gene_trees_dir,
-                 id_to_stem=None,
-                 subprocess_dir=None,
-                 shared_printClass=None):
+                 seqtype           = 'nuc',
+                 bes_support       = 0.0,
+                 astral_cmd        = 'astral',
+                 id_to_stem        = None,
+                 subprocess_dir    = None,
+                 shared_printClass = None):
         super().__init__(log, hcolor, bcolor, threads, subprocess_dir, shared_printClass)
         self.dir_prank           = Path(dir_prank)
         self.dir_super           = Path(dir_super)
         self.dir_treeforge       = Path(dir_treeforge)
         self.renamed_map         = renamed_map
+        self.seqtype             = seqtype
+        self.bes_support         = bes_support
+        self.astral_cmd          = astral_cmd
         self.id_to_stem          = id_to_stem if id_to_stem is not None else {}
         self.output_super_matrix = output_super_matrix
         self.super_bootstrap     = super_bootstrap
@@ -40,6 +46,7 @@ class Astral(BaseStage):
         self.cln_files           = ' '.join([str(self.dir_prank / f) for f in os.listdir(self.dir_prank) if f.endswith('.treefile')])
         self.alignment_files     = ' '.join([str(self.dir_prank / f) for f in os.listdir(self.dir_prank) if f.endswith('-cln')])
         self.concat_tree         = str(self.dir_super / 'concat.tre')
+        self.bes_concat_tree     = str(self.dir_super / 'concat_bes.tre')
         self.finaltree           = str(coalescent_tree_path)
         self.supermatrix         = str(self.dir_super / 'SuperMatrix.treefile')
         self.genetree            = str(supermatrix_tree_path)
@@ -92,15 +99,15 @@ class Astral(BaseStage):
         processed_files = 0
         unmapped_count  = 0
         
-        with open(self.concat_tree, 'w') as outfile:
+        with open(self.concat_tree, 'w') as outfile, open(self.bes_concat_tree, 'w') as bes_outfile:
             for file in self.cln_files.split():
                 try:
                     tree = ete3.Tree(file)
-                    tree_gene = tree.copy(method='deepcopy')
+                    tree_gene = tree.copy(method='newick')
                     
                     for node in tree.traverse():
                         if node.is_leaf():
-                            lookup_key = node.name.replace('_', '@', 1)  # Replace only first underscore
+                            lookup_key = node.name.replace('_', '@', 1)
                             if lookup_key in self.renamed_map:
                                 _, source_file = self.renamed_map[lookup_key]
                                 node.name = source_file.split('.')[0]
@@ -110,7 +117,7 @@ class Astral(BaseStage):
                     
                     for node in tree_gene.traverse():
                         if node.is_leaf():
-                            lookup_key = node.name.replace('_', '@', 1)  # Replace only first underscore
+                            lookup_key = node.name.replace('_', '@', 1)
                             if lookup_key in self.renamed_map:
                                 original_name, _ = self.renamed_map[lookup_key]
                                 node.name = original_name
@@ -119,12 +126,22 @@ class Astral(BaseStage):
                     
                     tree_gene.write(format=1, outfile=str(self.dir_gene_trees / (file.split('/')[-1].split('_')[0] + '.tre')))
                     outfile.write(tree.write(format=1) + '\n')
+
+                    tree_bes   = tree.copy(method='newick')
+                    seen       = set()
+                    to_keep    = []
+                    for leaf in tree_bes.get_leaves():
+                        if leaf.name not in seen:
+                            seen.add(leaf.name)
+                            to_keep.append(leaf)
+                    if len(to_keep) >= 4:
+                        tree_bes.prune(to_keep, preserve_branch_length=True)
+                        bes_outfile.write(tree_bes.write(format=1) + '\n')
+
                     processed_files += 1
                 except Exception as e:
                     self.printout('error', f'Failed to process tree file {file}: {str(e)}')
                     continue
-        
-        # self.printout('metric', f'Successfully processed {processed_files} tree files')
         
         if unmapped_count > 0:
             self.printout('warning', f'{unmapped_count} gene IDs could not be mapped to species names')
@@ -147,7 +164,7 @@ class Astral(BaseStage):
             sys.exit(1)
 
         self.printout('metric', 'Running ASTRAL on concatenated gene trees')
-        cmd = f'astral -i {self.concat_tree} -o {self.finaltree}'
+        cmd = f'{self.astral_cmd} -i {self.concat_tree} -o {self.finaltree}'
         
         run_stage_subprocess(cmd, 'ASTRAL', self.subprocess_dir, self.printout)
 
@@ -187,10 +204,11 @@ class Astral(BaseStage):
         file_dir = (self.dir_super / 'SuperMatrix').resolve()
         s_matrix = (self.dir_super / 'super.matrix').resolve()
         s_model  = (self.dir_super / 'super.model').resolve()
+        iqtree_model = 'LG+G' if self.seqtype == 'aa' else 'GTR+G'
         if self.super_bootstrap >= 1000:
-            cmd = f'iqtree2 -s {s_matrix} -spp {s_model} -nt {self.threads} -bb {self.super_bootstrap} -m GTR+G -pre {file_dir} -redo'
+            cmd = f'iqtree2 -s {s_matrix} -spp {s_model} -nt {self.threads} -bb {self.super_bootstrap} -m {iqtree_model} -pre {file_dir} -redo'
         else:
-            cmd = f'iqtree2 -s {s_matrix} -spp {s_model} -nt {self.threads} -m GTR+G -pre {file_dir} -redo'
+            cmd = f'iqtree2 -s {s_matrix} -spp {s_model} -nt {self.threads} -m {iqtree_model} -pre {file_dir} -redo'
 
         if self.subprocess_dir:
             result = run_logged_subprocess(cmd, self.subprocess_dir, 'IQ-TREE_SuperMatrix', shell=True, check=False)
@@ -199,9 +217,9 @@ class Astral(BaseStage):
 
         if result.returncode != 0:
             self.printout('warning', 'IQ-TREE SuperMatrix failed (e.g. internal NNI assertion on large alignments). Retrying with fast tree only (-n 0).')
-            cmd_fast = f'iqtree2 -s {s_matrix} -spp {s_model} -nt {self.threads} -n 0 -m GTR+G -pre {file_dir} -redo'
+            cmd_fast = f'iqtree2 -s {s_matrix} -spp {s_model} -nt {self.threads} -n 0 -m {iqtree_model} -pre {file_dir} -redo'
             if self.super_bootstrap >= 1000:
-                cmd_fast = f'iqtree2 -s {s_matrix} -spp {s_model} -nt {self.threads} -n 0 -bb {self.super_bootstrap} -m GTR+G -pre {file_dir} -redo'
+                cmd_fast = f'iqtree2 -s {s_matrix} -spp {s_model} -nt {self.threads} -n 0 -bb {self.super_bootstrap} -m {iqtree_model} -pre {file_dir} -redo'
             if self.subprocess_dir:
                 result = run_logged_subprocess(cmd_fast, self.subprocess_dir, 'IQ-TREE_SuperMatrix_fast', shell=True, check=False)
             else:
@@ -247,7 +265,8 @@ class Astral(BaseStage):
         self.printout('metric', 'Convert Coalescent Distance to Molecular Distance')
         bes_runner        = BES(printout=self.printout)
         species_trees_dir = str(self.molecular_tree_path).replace('/SpeciesTree.molecular.tre', '')
-        success           = bes_runner.run(self.finaltree, self.concat_tree, species_trees_dir)
+        bes_input         = self.bes_concat_tree if Path(self.bes_concat_tree).exists() else self.concat_tree
+        success           = bes_runner.run(self.finaltree, bes_input, species_trees_dir, supval=self.bes_support)
         if not success:
             self.printout('error', 'BES failed to process trees')
             sys.exit(1)

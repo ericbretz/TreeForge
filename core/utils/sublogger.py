@@ -51,7 +51,7 @@ def get_subprocess_dir(dir_logs: Path, run_timestamp: str) -> Path:
     return dir_logs / run_timestamp / 'subprocesses'
 
 def run_stage_subprocess(
-    cmd                : str,
+    cmd                : Union[str, List[str]],
     stage_name         : str,
     subprocess_dir     : Optional[Path],
     printout_func      : Callable,
@@ -60,14 +60,16 @@ def run_stage_subprocess(
 ) -> subprocess.CompletedProcess:
     if allowed_returncodes is None:
         allowed_returncodes = [0]
+
+    use_shell = isinstance(cmd, str)
     
     try:
         if subprocess_dir:
             result = run_logged_subprocess(cmd, subprocess_dir, stage_name.replace(' ', '_'), 
-                                          shell=True, check=False)
+                                          shell=use_shell, check=False)
         else:
             result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-                                   shell=True, check=False)
+                                   shell=use_shell, check=False)
         
         if check and result.returncode not in allowed_returncodes:
             raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)

@@ -33,7 +33,7 @@ class TreeForge:
     def __init__(self):
         self.early_log_lines = []
         self._log_writer = lambda text: self.early_log_lines.append(text)
-        nocolor_init = '--nocolor' in sys.argv
+        nocolor_init = any(arg in sys.argv for arg in ['--nocolor', '-nc'])
 
         self.highlight_color, self.background_color = print_logo(VERSION, log_func=self._log_writer, nocolor=nocolor_init)
         self.printClass                             = PrintOut('', self.highlight_color, self.background_color)
@@ -47,7 +47,7 @@ class TreeForge:
         self.original_defaults['subprocess_logs']   = False
         self.original_defaults['help']              = False
         self.original_defaults['version']           = False
-        self.original_defaults['nocolor']          = False
+        self.original_defaults['nocolor']           = False
 
     def parser(self, config_values=None):
         if len(sys.argv) == 1:
@@ -142,7 +142,8 @@ class TreeForge:
         parser.add_argument("--prune-min-tree-leaves",      "-pml", type=int,    help="Min tree leaves for pruning",                default=self.defaults_dict['prune_min_tree_leaves'])
         
         # PRANK
-        parser.add_argument("--prank-seqtype",              "-ps",  type=str,   help="Sequence type for PRANK",                     default=self.defaults_dict['prank_seqtype'],            choices=['dna', 'aa']) #maybe some day
+        parser.add_argument("--seqtype",                    "-st",  type=str,   help="Sequence type: nuc or aa (default: auto-detect)", default=self.defaults_dict['seqtype'],              choices=['nuc', 'aa'])
+        parser.add_argument("--astral-jar",                 "-aj",  type=str,   help="Path to ASTRAL jar file (if not using binary)",   default=self.defaults_dict['astral_jar'])
         parser.add_argument("--prank-pxclsq-threshold",     "-pp",  type=float, help="pxclsq probability threshold",                default=self.defaults_dict['prank_pxclsq_threshold'])
         parser.add_argument("--prank-bootstrap",            "-pb",  type=int,   help="IQ-TREE bootstrap replicates",                default=self.defaults_dict['prank_bootstrap'])
         
@@ -164,13 +165,13 @@ class TreeForge:
         parser.add_argument("--busco-max-targets",          "-bct", type=int,   help="BUSCO BLAST max target sequences",            default=self.defaults_dict['busco_max_targets'])
         parser.add_argument("--busco-coverage-threshold",   "-bcc", type=float, help="BUSCO coverage threshold",                    default=self.defaults_dict['busco_coverage_threshold'])
         # Configuration
-        parser.add_argument("--config",                             type=str,   help="Path to configuration file",                  default=None,                                           nargs="?", const=True)
-        parser.add_argument("--config-create",                      type=str,   help="Create a configuration template",             default=False,                                          nargs="?", const="config.yaml")
-        parser.add_argument("--config-save",                        type=str,   help="Save current arguments to config file",       default=False,                                          nargs="?", const="config.yaml")
+        parser.add_argument("--config",                     "-cfg", type=str,   help="Path to configuration file",                  default=None,                                           nargs="?", const=True)
+        parser.add_argument("--config-create",              "-cfc", type=str,   help="Create a configuration template",             default=False,                                          nargs="?", const="config.yaml")
+        parser.add_argument("--config-save",                "-cfs", type=str,   help="Save current arguments to config file",       default=False,                                          nargs="?", const="config.yaml")
         
         # Standard
         parser.add_argument("--version",                    "-v",               help="Print version",                                                                                       action="store_true",)
-        parser.add_argument("--nocolor",                                        help="Disable colored terminal output",                                                             default=self.defaults_dict['nocolor'],                    action="store_true")
+        parser.add_argument("--nocolor",                    "-nc",              help="Disable colored terminal output",                                                             default=self.defaults_dict['nocolor'],                    action="store_true")
         parser.add_argument("--log",                        "-l",   type=int,   help=argparse.SUPPRESS,                             default=self.defaults_dict['log'],                      choices=[0, 1, 2, 3, 4])
         parser.add_argument("--help",                       "-h",               help=argparse.SUPPRESS,                             default=self.defaults_dict['help'],                     action="store_true")
         
@@ -270,7 +271,7 @@ class TreeForge:
         if args.hcluster_enabled:
             print_hcluster_warning(args.highlight_color, log_func=self._log_writer, nocolor=nocolor)
 
-        deps = Deps(args.log, args.highlight_color, args.background_color, nocolor=nocolor)
+        deps = Deps(args.log, args.highlight_color, args.background_color, nocolor=nocolor, astral_jar=getattr(args, 'astral_jar', None), hcluster_tool=args.hcluster_tool if args.hcluster_enabled else None)
         deps.check_deps()
         self._file_exists(args.input_dir)
         dataHub = DataHub(args)

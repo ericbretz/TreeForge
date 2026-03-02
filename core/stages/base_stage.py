@@ -6,11 +6,11 @@ from core.utils.printout import PrintOut
 class BaseStage:
     def __init__(
         self,
-        log: int,
-        hc: str,
-        bc: str,
-        threads: Optional[int] = None,
-        subprocess_dir: Optional[Path] = None,
+        log              : int,
+        hc               : str,
+        bc               : str,
+        threads          : Optional[int] = None,
+        subprocess_dir   : Optional[Path] = None,
         shared_printClass: Optional[PrintOut] = None
     ):
         self.log            = log
