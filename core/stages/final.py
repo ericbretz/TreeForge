@@ -125,18 +125,18 @@ class Astral(BaseStage):
                                 node.name = node.name
                     
                     tree_gene.write(format=1, outfile=str(self.dir_gene_trees / (file.split('/')[-1].split('_')[0] + '.tre')))
-                    outfile.write(tree.write(format=1) + '\n')
 
-                    tree_bes   = tree.copy(method='newick')
-                    seen       = set()
-                    to_keep    = []
-                    for leaf in tree_bes.get_leaves():
+                    seen    = set()
+                    to_keep = []
+                    for leaf in tree.get_leaves():
                         if leaf.name not in seen:
                             seen.add(leaf.name)
                             to_keep.append(leaf)
                     if len(to_keep) >= 4:
-                        tree_bes.prune(to_keep, preserve_branch_length=True)
-                        bes_outfile.write(tree_bes.write(format=1) + '\n')
+                        tree.prune(to_keep, preserve_branch_length=True)
+                        tree_str = tree.write(format=1) + '\n'
+                        outfile.write(tree_str)
+                        bes_outfile.write(tree_str)
 
                     processed_files += 1
                 except Exception as e:
@@ -145,12 +145,11 @@ class Astral(BaseStage):
         
         if unmapped_count > 0:
             self.printout('warning', f'{unmapped_count} gene IDs could not be mapped to species names')
-            self.printout('warning', 'This may cause ASTRAL to produce an incorrect species tree')
+            # self.printout('warning', 'This may cause ASTRAL to produce an incorrect species tree')
 
     def astral(self):
         """
         Run ASTRAL.
-        ASTRAL creates a coalescent species tree from the concatenated gene trees.
         """
         # self.printout('metric', 'Astral')
         if Path(self.concat_tree).exists():
@@ -216,7 +215,7 @@ class Astral(BaseStage):
             result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
 
         if result.returncode != 0:
-            self.printout('warning', 'IQ-TREE SuperMatrix failed (e.g. internal NNI assertion on large alignments). Retrying with fast tree only (-n 0).')
+            self.printout('warning', 'IQ-TREE SuperMatrix failed')
             cmd_fast = f'iqtree2 -s {s_matrix} -spp {s_model} -nt {self.threads} -n 0 -m {iqtree_model} -pre {file_dir} -redo'
             if self.super_bootstrap >= 1000:
                 cmd_fast = f'iqtree2 -s {s_matrix} -spp {s_model} -nt {self.threads} -n 0 -bb {self.super_bootstrap} -m {iqtree_model} -pre {file_dir} -redo'

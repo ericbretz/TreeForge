@@ -1123,7 +1123,6 @@ class DataHub:
             self.printout('error', 'No valid tree files processed')
             return None
         
-        # self.printout('metric', f'Successfully processed {processed_count} tree files')
         if skipped_count > 0:
             self.printout('warning', f'Skipped {skipped_count} tree files due to errors')
         

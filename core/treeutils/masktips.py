@@ -289,7 +289,9 @@ class MaskTips:
         return curroot
 
     def prune_node(self, node, sister, char_dict):
-        if char_dict[node.label] > char_dict[sister.label]:
+        node_chars   = char_dict.get(node.label,   0)
+        sister_chars = char_dict.get(sister.label, 0)
+        if node_chars > sister_chars:
             return sister.prune()
         return node.prune()
     
