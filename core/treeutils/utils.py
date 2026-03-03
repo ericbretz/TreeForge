@@ -12,7 +12,7 @@ class TreeData:
 
 @lru_cache(maxsize=128)
 def get_name(label: str) -> str:
-	return label.split("@")[0]
+	return label.split("_")[0]
 	
 def get_clusterID(filename: str) -> str:
 	return Path(filename).stem

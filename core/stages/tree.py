@@ -69,12 +69,10 @@ class Tree(BaseStage):
         self._seq_dict_alt_cache = None
         
     def _get_base_cluster_id(self, cluster_id):
-        """Strip CutBranches piece suffix _p{N} to get the base cluster ID."""
         m = re.match(r'^(.+)_p\d+$', cluster_id)
         return m.group(1) if m else cluster_id
 
     def _base_cluster_name(self, cluster_id):
-        """Extract the bare cluster name (e.g. 'cluster50') from any accumulated cluster_id."""
         m = re.match(r'^(cluster\d+)', cluster_id)
         return m.group(1) if m else cluster_id
         

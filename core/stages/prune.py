@@ -127,8 +127,9 @@ class Prune(BaseStage):
         """Write multiple ortholog files from pruned trees."""
         self.printout('metric', 'Writing multiple ortholog trees')
         for file_path in self.ortho_mi_files:
-            name = file_path if len(file_path) < 35 else '...' + file_path[-35:]
-            self.printout('metric', f'Written: {name}')
+            s    = str(file_path)
+            name = s if len(s) < 35 else '...' + s[-35:]
+            # self.printout('metric', f'Written: {name}')
 
     def get_front_score(self, node):
         """Number of unique taxa in front."""
@@ -183,14 +184,14 @@ class Prune(BaseStage):
     def prune_node(self, score_tuple, node, root, pp_trees):
         """Prune a node either front or back based on scores."""
         if score_tuple[0] > score_tuple[1]:
-            self.printout('metric', f'Pruning front at node with {score_tuple[0]} taxa')
+            # self.printout('metric', f'Pruning front at node with {score_tuple[0]} taxa')
             pp_trees.append(node)
             par = node.prune()
             if par is not None and len(root.leaves()) >= 3:
                 par, root = remove_kink(par, root)
             return root, node == root
         else:
-            self.printout('metric', f'Pruning back at node with {score_tuple[1]} taxa')
+            # self.printout('metric', f'Pruning back at node with {score_tuple[1]} taxa')
             if node != root:
                 par = node.parent
                 par.remove_child(node)

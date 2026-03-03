@@ -176,16 +176,8 @@ class Quartet:
         return True
 
 def unroot(tree: Node) -> Node:
-    """Convert a bifurcating rooted tree to an unrooted trifurcating tree.
-
-    The original BES algorithm requires an unrooted tree. When ASTRAL outputs a
-    rooted (bifurcating) tree, the direct child of the root produces a quartet
-    with only one group on its left side (len(lefts)==1). The match() function
-    requires len(lmatched)>=2, so that branch can never be matched — always
-    producing a 0.0 molecular length regardless of the gene tree data.
-
-    Unrooting creates a trifurcating root whose children all produce quartets
-    with 2+ left groups, enabling proper matching.
+    """
+    Convert a rooted tree to an unrooted tree.
     """
     if len(tree.children) != 2:
         return tree
