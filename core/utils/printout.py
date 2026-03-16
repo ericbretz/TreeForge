@@ -21,6 +21,7 @@ class PrintOut:
     def _init_styles(self):
         _rev   = '\033[7m' if self.nocolor else None
         c      = _rev if self.nocolor else self.bc
+        metric = _rev if self.nocolor else '\033[47m'
         info_c = _rev if self.nocolor else '\033[43m'
         warn_c = _rev if self.nocolor else '\033[48;5;208m'
         prog_c = _rev if self.nocolor else '\033[47m'
@@ -32,7 +33,7 @@ class PrintOut:
         self.styles = {
             'title'   : {'color': c,   'width': 80, 'char': ' '},
             'subtitle': {'color': c,   'width': 80, 'char': ' '},
-            'metric'  : {'color': '\033[107m',   'width': 80, 'char': ' '},
+            'metric'  : {'color': metric, 'width': 80, 'char': ' '},
             'info'    : {'color': info_c, 'width': 80, 'char': ' '},
             'warning' : {'color': warn_c, 'width': 80, 'char': ' '},
             'progress': {'color': prog_c, 'width': 80, 'char': ' '},
@@ -318,7 +319,7 @@ class PrintOut:
                     metric_str = f'{metric_str:<20}│'
                     value_str  = self.fmt_str(str(value), value=True)
                     value_str  = f'{value_str:<{width - 21}}'
-                    output = f"{metric_str}{self._reset} {value_str}"
+                    output     = f"{metric_str}{self._reset} {value_str}"
                     print(output)
                     self._write_to_log(f"{metric_str} {value_str}")
                 else:
@@ -338,8 +339,8 @@ class PrintOut:
                 self._write_to_log(f"{metric_str} {value_str}")
         else:
             metric_str = self.fmt_str(self.fmt_key(str(metric)), value=None)
-            color = self.styles['metric']['color']
-            output = f"{color}{metric_str:^{width}}{self._reset}"
+            color      = self.styles['metric']['color']
+            output     = f"{color}{metric_str:^{width}}{self._reset}"
             print(output)
             self._write_to_log(f"{metric_str:^{width}}")
 

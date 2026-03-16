@@ -76,6 +76,8 @@ class Busco(BaseStage):
             self.printout('error', f'Input FASTA files not found: {missing_files}')
             return
         
+        # Pretty sloppy way to find euk_db but it works
+        # need to add a pro_db at some point and a argument to choose which one to use
         current_file_dir     = Path(__file__).resolve().parent
         treeforge_script_dir = current_file_dir.parent.parent
         self.busco_db_path   = treeforge_script_dir / 'core' / 'utils' / 'euk_db.faa'
@@ -237,7 +239,7 @@ class Busco(BaseStage):
         
         species_file_map = {}
         for f in self.busco_species_files:
-            fname = os.path.basename(f)
+            fname        = os.path.basename(f)
             species_name = fname.split('.')[0]
 
             if species_name not in species_file_map:

@@ -63,7 +63,7 @@ class Blast(BaseStage):
         PROTEIN_ONLY    = set('EFILPQZ')
         NUCLEOTIDE_ONLY = set('U')
         seq_chars       = []
-        max_sample      = 50000
+        max_sample      = 50000 # May be arbitrarily large sample, but still pretty quick.
 
         with open(self.files_concatenated, 'r') as f:
             for line in f:

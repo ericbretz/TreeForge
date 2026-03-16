@@ -398,7 +398,6 @@ class DataHub:
                 fai_dest = dir_fai / fai.name
                 shutil.move(str(fai), str(fai_dest))
         
-        # please make these logs optional, phyx family
         phyx_log_parent = self.dir_treeforge.parent / 'phyx.logfile'
         if phyx_log_parent.exists():
             phyx_log_parent.unlink()
@@ -633,7 +632,7 @@ class DataHub:
                     self.species_map[unique_id] = str(f)
                     self.stem_to_id[f.stem]     = unique_id
                     self.id_to_stem[unique_id]  = f.stem
-                    self.printout('info', f"  Mapped '{f.name}' -> ID '{unique_id}'")
+                    # self.printout('info', f"  Mapped '{f.name}' -> ID '{unique_id}'")
         
     def _contig_renamer(self):
         """Rename the contigs/transcripts/scaffolds.
@@ -1095,7 +1094,7 @@ class DataHub:
                                 if hasattr(self, 'stem_to_id') and original_stem in self.stem_to_id:
                                     node.name = self.stem_to_id[original_stem]
                                 else:
-                                    node.name = source_file.split('.')[0]
+                                    node.name = original_stem.replace('.', '_')
                             else:
                                 seq_id = node.name
                                 if '@' in seq_id:

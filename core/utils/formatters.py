@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Union
 
-
 def format_bytes(bytes_num: int) -> str:
     units      = ['B', 'KB', 'MB', 'GB', 'TB']
     value      = float(bytes_num)

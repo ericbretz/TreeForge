@@ -342,9 +342,6 @@ class BaseDecorator:
         
         lines = []
         
-        lines.append("=" * 80)
-        lines.append(f"TREEFORGE PIPELINE LOG - {func_name.upper()} STAGE")
-        lines.append("=" * 80)
         lines.append(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append(f"Status: {status}")
         lines.append(f"Duration: {execution_time:.2f} seconds")
@@ -354,14 +351,9 @@ class BaseDecorator:
         
         lines.append("")
         
-        description = self._get_function_description(original_func)
-        lines.append("DESCRIPTION:")
-        lines.append(f"{description}")
-        lines.append("")
-        
         params = self._get_function_params(datahub, func_name)
         if params:
-            lines.append("CONFIGURATION:")
+            lines.append("CONFIG:")
             for param_name, param_value in params.items():
                 if isinstance(param_value, float):
                     if param_value < 0.01:
@@ -378,7 +370,7 @@ class BaseDecorator:
         
         metric_lines = self._format_metrics(func_name, result)
         if metric_lines:
-            lines.append("PROCESSING METRICS:")
+            lines.append("METRICS:")
             lines.extend(metric_lines)
             lines.append("")
         
@@ -453,8 +445,6 @@ class BaseDecorator:
         summary = self._generate_summary(func_name, status, result, execution_time, new_files)
         lines.append(f"{summary}")
         lines.append("")
-        
-        lines.append("=" * 80)
         
         return lines
     

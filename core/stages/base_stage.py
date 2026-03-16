@@ -2,7 +2,10 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 from core.utils.printout import PrintOut
 
-
+"""
+These are used by all/most stages without variation.
+So keeping the variables uniform here for simplicity
+"""
 class BaseStage:
     def __init__(
         self,

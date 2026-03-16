@@ -40,6 +40,7 @@ class Astral(BaseStage):
         self.bes_support         = bes_support
         self.astral_cmd          = astral_cmd
         self.id_to_stem          = id_to_stem if id_to_stem is not None else {}
+        self.stem_to_id          = {v: k for k, v in self.id_to_stem.items()} if self.id_to_stem else {}
         self.output_super_matrix = output_super_matrix
         self.super_bootstrap     = super_bootstrap
 
@@ -110,7 +111,12 @@ class Astral(BaseStage):
                             lookup_key = node.name.replace('_', '@', 1)
                             if lookup_key in self.renamed_map:
                                 _, source_file = self.renamed_map[lookup_key]
-                                node.name = source_file.split('.')[0]
+                                source_stem    = Path(source_file).stem
+                                original_stem  = source_stem[:-6] if source_stem.endswith('_busco') else source_stem
+                                if original_stem in self.stem_to_id:
+                                    node.name = self.stem_to_id[original_stem]
+                                else:
+                                    node.name = original_stem.replace('.', '_')
                             else:
                                 node.name = node.name.split('.')[0]
                                 unmapped_count += 1

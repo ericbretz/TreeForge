@@ -176,9 +176,6 @@ class Quartet:
         return True
 
 def unroot(tree: Node) -> Node:
-    """
-    Convert a rooted tree to an unrooted tree.
-    """
     if len(tree.children) != 2:
         return tree
     c0, c1 = tree.children[0], tree.children[1]
@@ -446,11 +443,6 @@ class BES:
                 gene_trees = [line.strip() for line in f if line.strip()]
             
             sp_tree = build(species_tree_str)
-
-            # BES requires an unrooted tree. ASTRAL outputs a rooted (bifurcating)
-            # tree where the root's direct child produces a quartet with only one
-            # left group, making match() always fail for that branch (0.0 length).
-            # Unrooting to a trifurcation gives every internal node 2+ left groups.
             sp_tree = unroot(sp_tree)
 
             is_valid, error_msg, depth = validate_tree_structure(sp_tree)
@@ -478,7 +470,6 @@ class BES:
                            sp_quartet_tree: Dict[Quartet, List[float]],
                            sp_tree: Node,
                            supval: float = 0.0) -> Tuple[Node, Dict[Quartet, List[float]]]:
-        """Process gene trees and match quartets."""
         processed_trees = 0
 
         for count, gene in enumerate(g_tree):

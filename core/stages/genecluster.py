@@ -115,10 +115,6 @@ class GeneCluster(BaseStage):
         return blast_hits
     
     def _parse_sequence_id(self, seq_id: str) -> Tuple[str, str]:
-        """
-        Parse sequence ID.
-        Split sequence ID by '@' and return the first and second parts.
-        """
         try:
             parts = seq_id.split('@')
             if len(parts) == 2:
